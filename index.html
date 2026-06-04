@@ -1,0 +1,817 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LISTA OFF</title>
+
+<!-- ============================================================= -->
+<!--  PASSO 1: COLE AQUI A CONFIG DO SEU PROJETO FIREBASE          -->
+<!--  (Firebase Console > Config do projeto > Seus apps > SDK)     -->
+<!-- ============================================================= -->
+<script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyBEx6j4jafx1wpQ5VwRBEZ8OaMuCOTOf64",
+    authDomain: "lista-off-bc957.firebaseapp.com",
+    projectId: "lista-off-bc957",
+    storageBucket: "lista-off-bc957.firebasestorage.app",
+    messagingSenderId: "1012523540738",
+    appId: "1:1012523540738:web:8c6c4d7f2f4f1c4fc0221b"
+  };
+  // SENHA DO ADMIN GERAL (troque para o que quiser)
+  const SENHA_ADMIN = "madala@417";
+  // SENHA DA PORTARIA
+  const SENHA_PORTARIA = "madala@417";
+</script>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import {
+    getFirestore, collection, doc, addDoc, getDoc, getDocs, updateDoc,
+    deleteDoc, onSnapshot, query, where, orderBy, serverTimestamp, setDoc
+  } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+  // expõe pro resto do script (não-module) abaixo
+  window._fb = { db, collection, doc, addDoc, getDoc, getDocs, updateDoc, deleteDoc, onSnapshot, query, where, orderBy, serverTimestamp, setDoc };
+  window.dispatchEvent(new Event("fb-ready"));
+</script>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --green:#22C55E;
+  --green-soft:#16A34A;
+  --green-ink:#04140B;
+  --bg:#0A0E0C;
+  --surface:#121815;
+  --surface-2:#1A211D;
+  --line:#222B26;
+  --ink:#E8EDEA;
+  --muted:#7E8B84;
+  --accent:#22C55E;          /* verde confiança */
+  --accent-ink:#04140B;
+  --danger:#F87171;
+  --warn:#FBBF24;
+  --radius:14px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{
+  font-family:'Inter',-apple-system,system-ui,sans-serif;
+  background:var(--bg);
+  color:var(--ink);
+  min-height:100vh;
+  -webkit-font-smoothing:antialiased;
+  background-image:radial-gradient(circle at 50% -10%, rgba(34,197,94,.07), transparent 55%);
+}
+h1,h2,.display,.logo,.big,.stat .n{font-family:'Space Grotesk',sans-serif}
+
+.wrap{max-width:920px;margin:0 auto;padding:22px 20px 90px}
+.topbar{display:flex;align-items:center;gap:12px;padding:8px 0 28px}
+.logo{font-weight:700;font-size:20px;letter-spacing:-.5px;display:flex;align-items:center;gap:2px;color:var(--ink)}
+.logo .off{background:var(--green);color:var(--green-ink);padding:1px 9px;border-radius:8px;margin-left:6px;font-weight:700}
+.tag{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:2px;color:var(--muted);margin-left:auto;border:1px solid var(--line);padding:6px 12px;border-radius:999px}
+
+.btn{
+  border:none;border-radius:10px;padding:13px 22px;font-family:'Inter';
+  font-weight:600;font-size:14px;cursor:pointer;transition:.16s;display:inline-flex;
+  align-items:center;gap:8px;justify-content:center;
+}
+.btn-primary{background:var(--green);color:var(--green-ink)}
+.btn-primary:hover{filter:brightness(1.08);transform:translateY(-1px)}
+.btn-green{background:var(--green);color:var(--green-ink)}
+.btn-green:hover{filter:brightness(1.08);transform:translateY(-1px)}
+.btn-ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+.btn-ghost:hover{border-color:var(--green);color:var(--green)}
+.btn-teal{background:var(--surface-2);color:var(--ink);border:1px solid var(--line)}
+.btn-teal:hover{border-color:var(--green);color:var(--green)}
+.btn-sm{padding:8px 14px;font-size:13px}
+.btn:disabled{opacity:.4;cursor:not-allowed;transform:none}
+
+.card{background:var(--surface);border-radius:var(--radius);padding:24px;margin-bottom:16px;border:1px solid var(--line)}
+
+input,select{
+  width:100%;padding:13px 15px;border:1px solid var(--line);border-radius:10px;
+  font-family:'Inter';font-size:15px;background:var(--surface-2);color:var(--ink);transition:.15s;
+}
+input::placeholder{color:#5a6660}
+input:focus,select:focus{outline:none;border-color:var(--green)}
+label{font-weight:600;font-size:12px;display:block;margin:14px 0 6px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+.row{display:flex;gap:12px;flex-wrap:wrap}
+.row>div{flex:1;min-width:140px}
+
+.pill{display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:999px;font-size:12px;font-weight:600}
+.pill-pink{background:rgba(34,197,94,.12);color:var(--green)}
+.pill-teal{background:rgba(34,197,94,.12);color:var(--green)}
+.pill-gray{background:var(--surface-2);color:var(--muted)}
+
+.tabs{display:flex;gap:8px;margin-bottom:22px;flex-wrap:wrap}
+.tab{padding:9px 16px;border-radius:999px;background:var(--surface);border:1px solid var(--line);cursor:pointer;font-weight:600;font-size:13px;color:var(--muted)}
+.tab.active{background:var(--green);color:var(--green-ink);border-color:var(--green)}
+
+.hidden{display:none!important}
+.center{text-align:center}
+.muted{color:var(--muted);font-size:14px}
+.big{font-size:clamp(26px,5.5vw,40px);line-height:1.05;margin-bottom:8px;letter-spacing:-1px}
+
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px}
+.stat{background:var(--surface);border-radius:14px;padding:18px;text-align:center;border:1px solid var(--line)}
+.stat .n{font-size:32px;font-weight:700;color:var(--green);line-height:1}
+.stat .l{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin-top:6px}
+
+.list-item{display:flex;align-items:center;gap:12px;padding:14px;border-radius:12px;border:1px solid var(--line);margin-bottom:8px;background:var(--surface);transition:.15s}
+.list-item.in{background:rgba(34,197,94,.1);border-color:rgba(34,197,94,.45)}
+.list-item .nm{font-weight:600;flex:1}
+.list-item .wpp{font-size:13px;color:var(--muted)}
+.sex-m{color:#60A5FA}.sex-f{color:#F472B6}.sex-o{color:var(--muted)}
+
+.linkbox{display:flex;gap:8px;align-items:center;background:var(--surface-2);border:1px dashed var(--green);border-radius:12px;padding:10px;margin-top:10px}
+.linkbox input{border:none;background:transparent;font-size:13px;padding:6px;color:var(--green)}
+
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(120px);background:var(--green);color:var(--green-ink);padding:13px 22px;border-radius:999px;font-weight:600;font-size:14px;transition:.3s;z-index:999}
+.toast.show{transform:translateX(-50%) translateY(0)}
+
+.event-row{display:flex;align-items:center;gap:12px;padding:16px;border-radius:12px;background:var(--surface);border:1px solid var(--line);margin-bottom:10px;cursor:pointer;transition:.15s}
+.event-row:hover{border-color:var(--green);transform:translateX(3px)}
+.event-row .t{font-weight:600;font-size:16px}
+.search-box{position:relative;margin-bottom:16px}
+.search-box input{padding-left:42px}
+.search-box::before{content:"⌕";position:absolute;left:15px;top:9px;font-size:22px;color:var(--muted)}
+
+.fab-back{background:none;border:none;color:var(--muted);font-weight:600;cursor:pointer;font-size:14px;margin-bottom:14px;display:inline-flex;gap:6px;align-items:center}
+.fab-back:hover{color:var(--green)}
+.loader{text-align:center;padding:40px;color:var(--muted)}
+.empty{text-align:center;padding:40px 20px;color:var(--muted)}
+.empty .ic{font-size:42px;margin-bottom:10px;opacity:.5}
+
+/* ===== LANDING (3 acessos) ===== */
+.hero{text-align:center;padding:24px 0 14px}
+.hero h1{font-size:clamp(30px,7vw,46px);letter-spacing:-1.5px;line-height:1}
+.hero h1 .off{background:var(--green);color:var(--green-ink);padding:0 12px;border-radius:10px}
+.hero p{color:var(--muted);margin-top:10px;font-size:16px}
+.access-card{display:flex;align-items:center;gap:16px;padding:22px;border-radius:var(--radius);background:var(--surface);border:1px solid var(--line);margin-bottom:14px;cursor:pointer;transition:.18s;text-align:left;width:100%;font-family:inherit}
+.access-card:hover{transform:translateY(-2px);border-color:var(--green);box-shadow:0 12px 30px -16px rgba(34,197,94,.3)}
+.access-card .ico{width:52px;height:52px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:26px;flex:none}
+.access-card .ico.p{background:var(--surface-2)}
+.access-card .ico.g{background:rgba(34,197,94,.14)}
+.access-card .txt{flex:1}
+.access-card .txt h3{font-family:'Space Grotesk';font-size:18px;font-weight:700;margin-bottom:3px;color:var(--ink)}
+.access-card .txt p{color:var(--muted);font-size:13px;margin:0}
+.access-card .arr{color:var(--green);font-size:20px}
+.admin-foot{text-align:center;margin-top:30px}
+.admin-foot button{background:none;border:none;color:var(--muted);font-size:12px;cursor:pointer;opacity:.6;letter-spacing:.5px;text-transform:uppercase;font-weight:600}
+.admin-foot button:hover{opacity:1;color:var(--green)}
+
+@media(max-width:600px){
+  .wrap{padding:14px 14px 80px}
+  .card{padding:18px}
+  .access-card{padding:18px;gap:12px}
+  .access-card .ico{width:44px;height:44px;font-size:22px}
+  .stat-grid{grid-template-columns:repeat(2,1fr)}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar">
+    <a class="logo" href="?" style="text-decoration:none">LISTA<span class="off">OFF</span></a>
+    <div class="tag" id="modeTag"></div>
+  </div>
+  <div id="app"><div class="loader">carregando…</div></div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* =================== UTIL =================== */
+const $ = s => document.querySelector(s);
+const app = $("#app");
+let DB, FB;
+let CTX = { eventoId:null, listaId:null }; // navegação admin
+
+function toast(msg){const t=$("#toast");t.textContent=msg;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),2600);}
+function esc(s){return (s||"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));}
+function slug(){return Math.random().toString(36).slice(2,9);}
+function sexLabel(s){return s==="M"?"Masculino":s==="F"?"Feminino":"Outro";}
+function fmtBRL(v){return "R$ "+Number(v||0).toFixed(2).replace(".",",");}
+function sexClass(s){return s==="M"?"sex-m":s==="F"?"sex-f":"sex-o";}
+function baseUrl(){return location.origin+location.pathname;}
+
+/* =================== ROUTER =================== */
+function route(){
+  // imita o unsubscribe do Firebase ao trocar de tela
+  if(window._clearListeners) window._clearListeners();
+  const p = new URLSearchParams(location.search);
+  const view = p.get("v");
+  if(view==="portaria") return guardPortaria();
+  if(view==="banco") return guardAdmin();
+  if(view==="admin") return guardAdmin();          // admin geral (rodapé)
+  if(view==="parceiro") return renderParceiro();    // formulário "quero lista off"
+  // link público de cadastro: tem lista mas não é tela interna
+  if(p.get("lista") && !p.get("admin")) return renderPublic(p.get("ev"), p.get("lista"));
+  if(p.get("ev") && p.get("admin")) return guardAdmin(); // detalhe evento (admin)
+  if(p.get("ev")) return guardAdmin();
+  return renderLanding();
+}
+
+/* =================== LANDING (3 acessos) =================== */
+function renderLanding(){
+  $("#modeTag").textContent="";
+  app.innerHTML = `
+    <div class="hero">
+      <h1>LISTA <span class="off">OFF</span></h1>
+      <p>O jeito mais rápido de gerenciar listas do seu rolê.</p>
+    </div>
+    <button class="access-card" onclick="go({v:'portaria'})">
+      <div class="ico p">🎟️</div>
+      <div class="txt"><h3>Acesso à Portaria</h3><p>Login da equipe que faz o check-in na entrada.</p></div>
+      <div class="arr">→</div>
+    </button>
+    <button class="access-card" onclick="go({v:'parceiro'})">
+      <div class="ico g">🚀</div>
+      <div class="txt"><h3>Quero a Lista OFF no meu evento</h3><p>Fale com a gente e comece a usar.</p></div>
+      <div class="arr">→</div>
+    </button>
+    <div class="admin-foot">
+      <button onclick="go({v:'admin'})">· admin geral ·</button>
+    </div>`;
+}
+
+/* =================== FORM PARCEIRO (WhatsApp) =================== */
+// >>> TROQUE pelo seu número com DDI+DDD, só dígitos. Ex: 5538999999999
+const WHATSAPP_DESTINO = "5538991710202";
+function renderParceiro(){
+  $("#modeTag").textContent="";
+  app.innerHTML = `
+    <button class="fab-back" onclick="go({})">← voltar</button>
+    <div class="card">
+      <h2 class="big" style="font-size:26px;color:var(--green)">Quero a Lista OFF 🚀</h2>
+      <p class="muted" style="margin-bottom:6px">Preenche aí que a gente fala com você no WhatsApp.</p>
+      <label>Seu nome</label>
+      <input id="paNome" placeholder="Nome completo">
+      <label>WhatsApp (com DDD)</label>
+      <input id="paWpp" placeholder="(38) 9 9999-9999" inputmode="tel">
+      <label>Ramo de atividade</label>
+      <input id="paRamo" placeholder="Ex: balada, bar, produtora de eventos…">
+      <button class="btn btn-green" style="width:100%;margin-top:20px" id="paSend">Começar →</button>
+    </div>`;
+  $("#paSend").onclick=()=>{
+    const nome=$("#paNome").value.trim(), wpp=$("#paWpp").value.trim(), ramo=$("#paRamo").value.trim();
+    if(nome.length<3) return toast("Digite seu nome");
+    if(wpp.replace(/\D/g,"").length<10) return toast("WhatsApp inválido");
+    if(!ramo) return toast("Digite o ramo de atividade");
+    const msg=`Olá! Quero colocar a *Lista OFF* no meu evento.%0A%0A*Nome:* ${encodeURIComponent(nome)}%0A*WhatsApp:* ${encodeURIComponent(wpp)}%0A*Ramo:* ${encodeURIComponent(ramo)}`;
+    window.open(`https://wa.me/${WHATSAPP_DESTINO}?text=${msg}`,"_blank");
+    app.innerHTML=`<div class="card center"><h2 class="big" style="color:var(--green)">Tudo certo! ✅</h2>
+      <p class="muted">Abrimos o WhatsApp pra você enviar a mensagem. Se não abriu, confere se o WhatsApp está instalado.</p>
+      <button class="btn btn-ghost" style="margin-top:16px" onclick="go({})">voltar ao início</button></div>`;
+  };
+}
+
+/* =================== FIREBASE READY =================== */
+function onFbReady(){
+  FB = window._fb; DB = FB.db;
+  if(firebaseConfig.apiKey==="COLE_AQUI"){
+    app.innerHTML = `<div class="card center"><h2 class="big">⚠️ Falta configurar o Firebase</h2>
+      <p class="muted">Abra o arquivo e cole a config do seu projeto Firebase no topo (bloco marcado <b>PASSO 1</b>), depois suba de novo no Netlify.</p></div>`;
+    return;
+  }
+  route();
+}
+window.addEventListener("fb-ready", onFbReady);
+// se a camada de dados já carregou antes deste script, roda direto
+if(window._fbReady){ onFbReady(); }
+window.addEventListener("popstate", route);
+function go(params){
+  const u = new URL(location.href);
+  u.search = new URLSearchParams(params).toString();
+  history.pushState({},"",u); route();
+}
+
+/* ====================================================== */
+/* ===============  PÁGINA PÚBLICA (cliente)  =========== */
+/* ====================================================== */
+async function renderPublic(evId, listaId){
+  $("#modeTag").textContent="Cadastro";
+  app.innerHTML = `<div class="loader">carregando lista…</div>`;
+  try{
+    const evSnap = await FB.getDoc(FB.doc(DB,"eventos",evId));
+    const lSnap  = await FB.getDoc(FB.doc(DB,"eventos",evId,"listas",listaId));
+    if(!evSnap.exists()||!lSnap.exists()){app.innerHTML=`<div class="card center"><h2 class="big">Lista não encontrada</h2></div>`;return;}
+    const ev=evSnap.data(), L=lSnap.data();
+
+    // janela de tempo
+    const now=Date.now();
+    const ini=L.inicio?new Date(L.inicio).getTime():null;
+    const fim=L.fim?new Date(L.fim).getTime():null;
+    if(ini&&now<ini){app.innerHTML=card(`<h2 class="big">A lista ainda não abriu ⏳</h2><p class="muted">Abre em ${fmt(L.inicio)}</p>`);return;}
+    if(fim&&now>fim){app.innerHTML=card(`<h2 class="big">Lista encerrada 🚫</h2><p class="muted">Fechou em ${fmt(L.fim)}</p>`);return;}
+
+    // limite de vagas
+    let cheio=false;
+    if(L.limite && L.limite>0){
+      const c=await FB.getDocs(FB.collection(DB,"eventos",evId,"listas",listaId,"cadastros"));
+      if(c.size>=L.limite) cheio=true;
+    }
+    if(cheio){app.innerHTML=card(`<h2 class="big">Lista lotada 😱</h2><p class="muted">Todas as vagas foram preenchidas.</p>`);return;}
+
+    app.innerHTML = `
+    <div class="card center" style="background:linear-gradient(135deg,var(--surface),var(--surface-2))">
+      <span class="pill pill-teal">${esc(ev.nome)}${ev.data?` · ${new Date(ev.data+'T00:00').toLocaleDateString('pt-BR')}`:''}</span>
+      <h1 class="big" style="margin-top:14px;color:var(--green)">${esc(L.nome)}</h1>
+      ${L.valor>0?`<span class="pill pill-pink" style="margin-top:8px">Entrada ${fmtBRL(L.valor)} · paga na portaria</span>`:`<span class="pill pill-gray" style="margin-top:8px">Lista OFF · grátis</span>`}
+      ${ev.descricao?`<p class="muted" style="margin-top:8px">${esc(ev.descricao)}</p>`:""}
+      <p class="muted" style="margin-top:8px">Garanta seu nome na lista</p>
+    </div>
+    <div class="card" id="formCard">
+      <label>Nome completo</label>
+      <input id="pNome" placeholder="Seu nome completo" autocomplete="name">
+      <label>WhatsApp (com DDD)</label>
+      <input id="pWpp" placeholder="(38) 9 9999-9999" inputmode="tel">
+      <label>Sexo</label>
+      <select id="pSex"><option value="">Selecione…</option><option value="F">Feminino</option><option value="M">Masculino</option><option value="O">Outro</option></select>
+      <button class="btn btn-primary" style="width:100%;margin-top:20px" id="pSend">Entrar na lista</button>
+    </div>`;
+
+    $("#pSend").onclick = async () => {
+      const nome=$("#pNome").value.trim(), wpp=$("#pWpp").value.trim(), sex=$("#pSex").value;
+      if(nome.length<3) return toast("Digite seu nome completo");
+      if(wpp.replace(/\D/g,"").length<10) return toast("WhatsApp inválido");
+      if(!sex) return toast("Selecione o sexo");
+      $("#pSend").disabled=true; $("#pSend").textContent="enviando…";
+      try{
+        await FB.addDoc(FB.collection(DB,"eventos",evId,"listas",listaId,"cadastros"),{
+          nome, nomeLower:nome.toLowerCase(), wpp, sex, checkin:false, criadoEm:FB.serverTimestamp()
+        });
+        $("#formCard").outerHTML = `<div class="card center" style="background:rgba(198,255,58,.06);border-color:rgba(198,255,58,.35)">
+          <h2 class="big" style="color:var(--green)">Tá na lista! ✅</h2>
+          ${L.valor>0
+            ? `<p style="font-weight:600;font-size:17px;margin-top:4px">Pagamento de ${fmtBRL(L.valor)} na portaria</p>
+               <p class="muted" style="margin-top:6px">${esc(nome)}, é só chegar, falar seu nome e pagar na entrada.</p>`
+            : `<p class="muted">${esc(nome)}, é só chegar e falar seu nome na portaria.</p>`}
+          <span class="pill pill-pink" style="margin-top:14px">${esc(ev.nome)} · ${esc(L.nome)}</span></div>`;
+      }catch(e){console.error(e);toast("Erro ao enviar, tente de novo");$("#pSend").disabled=false;$("#pSend").textContent="Entrar na lista";}
+    };
+  }catch(e){console.error(e);app.innerHTML=card(`<h2 class="big">Erro ao carregar</h2><p class="muted">${esc(e.message)}</p>`);}
+}
+function card(html){return `<div class="card center">${html}</div>`;}
+function fmt(d){if(!d)return"";const x=new Date(d);return x.toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"});}
+
+/* ====================================================== */
+/* =====================  LOGIN  ======================== */
+/* ====================================================== */
+function loginScreen(titulo, onOk){
+  app.innerHTML = `<div class="card center" style="max-width:420px;margin:40px auto">
+    <h2 class="big">${titulo}</h2>
+    <label style="text-align:left">Senha</label>
+    <input id="pw" type="password" placeholder="senha de acesso">
+    <button class="btn btn-primary" style="width:100%;margin-top:18px" id="logBtn">Entrar</button>
+    <p class="muted" style="margin-top:14px"><a href="?" style="color:var(--green)">cliente? clique aqui</a></p>
+  </div>`;
+  const tryLog=()=>onOk($("#pw").value);
+  $("#logBtn").onclick=tryLog;
+  $("#pw").addEventListener("keydown",e=>{if(e.key==="Enter")tryLog();});
+}
+function guardAdmin(){
+  if(sessionStorage.adminOk==="1") return renderAdmin();
+  $("#modeTag").textContent="Admin Geral";
+  loginScreen("Admin Geral 🔐",(pw)=>{if(pw===SENHA_ADMIN){sessionStorage.adminOk="1";renderAdmin();}else toast("Senha incorreta");});
+}
+function guardPortaria(){
+  if(sessionStorage.portOk==="1") return renderPortariaPick();
+  $("#modeTag").textContent="Portaria";
+  loginScreen("Portaria 🎟️",(pw)=>{if(pw===SENHA_PORTARIA||pw===SENHA_ADMIN){sessionStorage.portOk="1";renderPortariaPick();}else toast("Senha incorreta");});
+}
+
+/* ====================================================== */
+/* ==================  ADMIN GERAL  ===================== */
+/* ====================================================== */
+function adminTabs(active){
+  return `<div class="tabs">
+    <div class="tab ${active==='ev'?'active':''}" onclick="go({v:'admin'})">Eventos</div>
+    <div class="tab ${active==='bd'?'active':''}" onclick="go({v:'banco'})">Banco de Dados</div>
+    <div class="tab" onclick="window.open('?v=portaria','_blank')">Abrir Portaria ↗</div>
+  </div>`;
+}
+
+async function renderAdmin(){
+  const p=new URLSearchParams(location.search);
+  if(p.get("v")==="banco") return renderBanco();
+  if(p.get("ev")) return renderEventoDetalhe(p.get("ev"));
+  $("#modeTag").textContent="Admin Geral";
+  app.innerHTML = adminTabs('ev') + `
+    <div class="card">
+      <h2 style="margin-bottom:4px">Criar evento</h2>
+      <p class="muted" style="margin-bottom:8px">Ex: Japa NK</p>
+      <div class="row">
+        <div><label>Nome do evento</label><input id="evNome" placeholder="Nome do evento"></div>
+        <div><label>Data</label><input id="evData" type="date"></div>
+      </div>
+      <label>Descrição (aparece no link de cadastro)</label>
+      <input id="evDesc" placeholder="Ex: Sexta, a partir das 22h · Open bar até meia-noite">
+      <button class="btn btn-primary" style="margin-top:16px" id="evCriar">Criar evento</button>
+    </div>
+    <h2 style="margin:24px 0 12px">Seus eventos</h2>
+    <div id="evLista"><div class="loader">carregando…</div></div>`;
+
+  $("#evCriar").onclick=async()=>{
+    const nome=$("#evNome").value.trim(), data=$("#evData").value, descricao=$("#evDesc").value.trim();
+    if(!nome) return toast("Digite o nome do evento");
+    await FB.addDoc(FB.collection(DB,"eventos"),{nome,data,descricao,criadoEm:FB.serverTimestamp()});
+    $("#evNome").value="";$("#evData").value="";$("#evDesc").value="";toast("Evento criado! 🎉");
+  };
+
+  FB.onSnapshot(FB.query(FB.collection(DB,"eventos"),FB.orderBy("criadoEm","desc")),async snap=>{
+    if(snap.empty){$("#evLista").innerHTML=`<div class="empty"><div class="ic">🗓️</div>Nenhum evento ainda. Crie o primeiro!</div>`;return;}
+    const docs=snap.docs;
+    // monta cada linha já com a contagem somada de todas as listas
+    const rows = await Promise.all(docs.map(async d=>{
+      const e=d.data();
+      const c=await contarEvento(d.id);
+      const dataTxt=e.data?new Date(e.data+'T00:00').toLocaleDateString('pt-BR'):'sem data';
+      const contagem = c.total>0
+        ? `<span class="pill pill-pink">${c.total} ${c.total===1?'pessoa':'pessoas'}</span>
+           <span class="muted" style="font-size:12px">${c.f}♀ / ${c.m}♂${c.o?` / ${c.o}⚧`:''} · ${c.checkin} entraram</span>`
+        : `<span class="pill pill-gray">0 pessoas</span>`;
+      return `<div class="event-row" onclick="go({ev:'${d.id}'})">
+        <div style="flex:1">
+          <div class="t">${esc(e.nome)}</div>
+          <div class="muted" style="margin:2px 0 6px">${dataTxt}</div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${contagem}</div>
+        </div>
+        <span class="pill pill-pink">abrir →</span></div>`;
+    }));
+    $("#evLista").innerHTML=rows.join("");
+  });
+}
+
+/* conta cadastros de TODAS as listas de um evento, com breakdown */
+async function contarEvento(evId){
+  let total=0,f=0,m=0,o=0,checkin=0;
+  const listas=await FB.getDocs(FB.collection(DB,"eventos",evId,"listas"));
+  for(const l of listas.docs){
+    const cads=await FB.getDocs(FB.collection(DB,"eventos",evId,"listas",l.id,"cadastros"));
+    cads.forEach(c=>{const x=c.data();total++;
+      if(x.sex==="F")f++;else if(x.sex==="M")m++;else o++;
+      if(x.checkin)checkin++;});
+  }
+  return {total,f,m,o,checkin};
+}
+
+/* ---------- detalhe do evento + listas ---------- */
+async function renderEventoDetalhe(evId){
+  CTX.eventoId=evId;
+  const p=new URLSearchParams(location.search);
+  if(p.get("lista")&&p.get("admin")) return renderListaAdmin(evId,p.get("lista"));
+
+  const evSnap=await FB.getDoc(FB.doc(DB,"eventos",evId));
+  if(!evSnap.exists()){app.innerHTML="evento não encontrado";return;}
+  const ev=evSnap.data();
+  $("#modeTag").textContent=ev.nome;
+
+  app.innerHTML = `
+    <button class="fab-back" onclick="go({v:'admin'})">← voltar aos eventos</button>
+    <div class="card" style="background:linear-gradient(135deg,var(--surface),var(--surface-2))">
+      <span class="pill pill-teal">${ev.data?new Date(ev.data+'T00:00').toLocaleDateString('pt-BR'):'sem data'}</span>
+      <h1 class="big" style="color:var(--green);margin-top:10px">${esc(ev.nome)}</h1>
+      ${ev.descricao?`<p class="muted" style="margin-top:6px">${esc(ev.descricao)}</p>`:""}
+    </div>
+    <div class="stat-grid" id="evTotais" style="margin-bottom:16px"></div>
+    <div class="card">
+      <h2 style="margin-bottom:4px">Nova lista</h2>
+      <p class="muted" style="margin-bottom:8px">Ex: Aniversário do Fulano, Convidados do Madalena…</p>
+      <label>Nome da lista</label><input id="lNome" placeholder="Nome da lista">
+      <div class="row" style="margin-top:6px">
+        <div><label>Abre em (opcional)</label><input id="lIni" type="datetime-local"></div>
+        <div><label>Fecha em (opcional)</label><input id="lFim" type="datetime-local"></div>
+      </div>
+      <div class="row" style="margin-top:6px">
+        <div>
+          <label>Tipo da lista</label>
+          <select id="lTipo" onchange="document.getElementById('lValorWrap').style.display=this.value==='valor'?'block':'none'">
+            <option value="off">Lista OFF (grátis)</option>
+            <option value="valor">Lista com valor fixo</option>
+          </select>
+        </div>
+        <div id="lValorWrap" style="display:none">
+          <label>Valor (R$)</label><input id="lValor" type="number" min="0" step="1" placeholder="Ex: 20">
+        </div>
+      </div>
+      <div class="row" style="margin-top:6px;align-items:flex-end">
+        <div><label>Limite de nomes</label><input id="lLim" type="number" min="0" placeholder="0 = ilimitado" value="0"></div>
+        <div style="flex:0"><button class="btn btn-primary" id="lCriar">Criar lista</button></div>
+      </div>
+    </div>
+    <h2 style="margin:24px 0 12px">Listas deste evento</h2>
+    <div id="listasWrap"><div class="loader">carregando…</div></div>`;
+
+  $("#lCriar").onclick=async()=>{
+    const nome=$("#lNome").value.trim();
+    if(!nome) return toast("Digite o nome da lista");
+    const tipo=$("#lTipo").value;
+    let valor=0;
+    if(tipo==="valor"){
+      valor=parseFloat($("#lValor").value)||0;
+      if(valor<=0) return toast("Digite o valor da lista");
+    }
+    const ref=await FB.addDoc(FB.collection(DB,"eventos",evId,"listas"),{
+      nome, inicio:$("#lIni").value||null, fim:$("#lFim").value||null,
+      limite:parseInt($("#lLim").value)||0, valor, criadoEm:FB.serverTimestamp()
+    });
+    $("#lNome").value="";$("#lIni").value="";$("#lFim").value="";$("#lLim").value="0";
+    $("#lTipo").value="off";$("#lValor").value="";$("#lValorWrap").style.display="none";
+    toast("Lista criada! Link gerado 🔗");
+  };
+
+  FB.onSnapshot(FB.query(FB.collection(DB,"eventos",evId,"listas"),FB.orderBy("criadoEm","desc")),async snap=>{
+    if(snap.empty){
+      $("#listasWrap").innerHTML=`<div class="empty"><div class="ic">📝</div>Nenhuma lista. Crie a primeira!</div>`;
+      $("#evTotais").innerHTML="";
+      return;
+    }
+    let totEv=0,fEv=0,mEv=0,oEv=0,inEv=0;
+    const blocos = await Promise.all(snap.docs.map(async d=>{
+      const L=d.data();
+      const link=`${baseUrl()}?ev=${evId}&lista=${d.id}`;
+      const lim=L.limite>0?`limite ${L.limite}`:"ilimitada";
+      // conta cadastros desta lista
+      const cads=await FB.getDocs(FB.collection(DB,"eventos",evId,"listas",d.id,"cadastros"));
+      let t=0,f=0,m=0,o=0,ci=0;
+      cads.forEach(c=>{const x=c.data();t++;if(x.sex==="F")f++;else if(x.sex==="M")m++;else o++;if(x.checkin)ci++;});
+      totEv+=t;fEv+=f;mEv+=m;oEv+=o;inEv+=ci;
+      const vagas = L.limite>0?` / ${L.limite}`:"";
+      return `<div class="card" style="margin-bottom:12px">
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <h2 style="flex:1;font-size:20px">${esc(L.nome)}</h2>
+          ${L.valor>0?`<span class="pill pill-pink">${fmtBRL(L.valor)}</span>`:`<span class="pill pill-gray">OFF</span>`}
+          <span class="pill pill-gray">${lim}</span>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px">
+          <span class="pill pill-pink">${t}${vagas} ${t===1?'pessoa':'pessoas'}</span>
+          <span class="muted" style="font-size:13px">${f}♀ / ${m}♂${o?` / ${o}⚧`:''} · ${ci} entraram</span>
+        </div>
+        <div class="linkbox">
+          <input readonly value="${link}" id="lk_${d.id}">
+          <button class="btn btn-teal btn-sm" onclick="copyLink('lk_${d.id}')">copiar</button>
+        </div>
+        <div class="row" style="margin-top:12px">
+          <button class="btn btn-primary btn-sm" onclick="go({ev:'${evId}',lista:'${d.id}',admin:'1'})">ver cadastros / relatório</button>
+          <button class="btn btn-ghost btn-sm" onclick="shareWpp('${encodeURIComponent(L.nome)}','${encodeURIComponent(link)}')">WhatsApp</button>
+        </div>
+      </div>`;
+    }));
+    $("#listasWrap").innerHTML=blocos.join("");
+    // totalizador do evento (todas as listas somadas)
+    $("#evTotais").innerHTML=`
+      <div class="stat"><div class="n">${totEv}</div><div class="l">total no evento</div></div>
+      <div class="stat"><div class="n">${fEv}</div><div class="l">feminino</div></div>
+      <div class="stat"><div class="n">${mEv}</div><div class="l">masculino</div></div>
+      <div class="stat"><div class="n">${inEv}</div><div class="l">já entraram</div></div>`;
+  });
+}
+window.copyLink=(id)=>{const i=document.getElementById(id);i.select();navigator.clipboard.writeText(i.value);toast("Link copiado! 📋");};
+window.shareWpp=(nome,link)=>{const t=`📋 Entra na lista: ${decodeURIComponent(nome)}%0A%0A${decodeURIComponent(link)}`;window.open(`https://wa.me/?text=${t}`,"_blank");};
+
+/* ---------- lista admin (cadastros + relatório) ---------- */
+async function renderListaAdmin(evId,listaId){
+  const lSnap=await FB.getDoc(FB.doc(DB,"eventos",evId,"listas",listaId));
+  const L=lSnap.data();
+  $("#modeTag").textContent=L.nome;
+  app.innerHTML=`
+    <button class="fab-back" onclick="go({ev:'${evId}'})">← voltar às listas</button>
+    <h1 class="big" style="color:var(--green)">${esc(L.nome)}</h1>
+    <div class="stat-grid" id="stats" style="margin:16px 0"></div>
+    <div class="card">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+        <button class="btn btn-teal btn-sm" id="exp">⬇ Exportar CSV</button>
+      </div>
+      <div id="cadList"><div class="loader">carregando…</div></div>
+    </div>`;
+
+  FB.onSnapshot(FB.collection(DB,"eventos",evId,"listas",listaId,"cadastros"),snap=>{
+    const arr=[];snap.forEach(d=>arr.push({id:d.id,...d.data()}));
+    arr.sort((a,b)=>(a.nomeLower||"").localeCompare(b.nomeLower||""));
+    const total=arr.length, ins=arr.filter(x=>x.checkin).length;
+    const f=arr.filter(x=>x.sex==="F").length, m=arr.filter(x=>x.sex==="M").length;
+    const fIn=arr.filter(x=>x.sex==="F"&&x.checkin).length, mIn=arr.filter(x=>x.sex==="M"&&x.checkin).length;
+    $("#stats").innerHTML=`
+      <div class="stat"><div class="n">${total}</div><div class="l">na lista</div></div>
+      <div class="stat"><div class="n">${ins}</div><div class="l">entraram</div></div>
+      <div class="stat"><div class="n">${f}<span style="font-size:16px">/${fIn}</span></div><div class="l">fem / entrou</div></div>
+      <div class="stat"><div class="n">${m}<span style="font-size:16px">/${mIn}</span></div><div class="l">masc / entrou</div></div>`;
+    let h="";
+    if(!arr.length)h=`<div class="empty"><div class="ic">🫥</div>Ninguém cadastrado ainda.</div>`;
+    arr.forEach(c=>{h+=`<div class="list-item ${c.checkin?'in':''}">
+      <span class="${sexClass(c.sex)}">${c.sex==="F"?"♀":c.sex==="M"?"♂":"⚧"}</span>
+      <div style="flex:1"><div class="nm">${esc(c.nome)}</div><div class="wpp">${esc(c.wpp)}</div></div>
+      <span class="pill ${c.checkin?'pill-teal':'pill-gray'}">${c.checkin?'entrou ✓':'aguardando'}</span>
+    </div>`;});
+    $("#cadList").innerHTML=h;
+    window.__cad=arr;
+  });
+  $("#exp").onclick=()=>exportCSV(window.__cad||[],L.nome);
+}
+
+function exportCSV(arr,nome){
+  let csv="Nome,WhatsApp,Sexo,Entrou\n";
+  arr.forEach(c=>csv+=`"${c.nome}","${c.wpp}","${sexLabel(c.sex)}","${c.checkin?'Sim':'Não'}"\n`);
+  dl(csv,`lista-${nome}.csv`);
+}
+function dl(content,filename){
+  const b=new Blob(["\ufeff"+content],{type:"text/csv;charset=utf-8;"});
+  const a=document.createElement("a");a.href=URL.createObjectURL(b);a.download=filename;a.click();
+}
+
+/* ====================================================== */
+/* ================  BANCO DE DADOS  ==================== */
+/* ====================================================== */
+async function renderBanco(){
+  $("#modeTag").textContent="Banco de Dados";
+  app.innerHTML=adminTabs('bd')+`
+    <div class="card">
+      <h2>Banco de dados de contatos</h2>
+      <p class="muted">Todos os nomes e WhatsApp já cadastrados em qualquer evento/lista. Sem repetição (por WhatsApp).</p>
+      <div class="search-box" style="margin-top:14px"><input id="bdSearch" placeholder="buscar por nome ou WhatsApp…"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+        <button class="btn btn-teal btn-sm" id="bdExp">⬇ Exportar tudo (CSV)</button>
+        <span class="pill pill-pink" id="bdCount" style="align-self:center">…</span>
+      </div>
+      <div id="bdList"><div class="loader">juntando contatos de todos os eventos…</div></div>
+    </div>`;
+
+  // varre todos eventos > listas > cadastros
+  const contatos=new Map();
+  const eventos=await FB.getDocs(FB.collection(DB,"eventos"));
+  for(const ev of eventos.docs){
+    const listas=await FB.getDocs(FB.collection(DB,"eventos",ev.id,"listas"));
+    for(const l of listas.docs){
+      const cads=await FB.getDocs(FB.collection(DB,"eventos",ev.id,"listas",l.id,"cadastros"));
+      cads.forEach(c=>{const d=c.data();const key=(d.wpp||"").replace(/\D/g,"")||d.nomeLower;
+        if(!contatos.has(key))contatos.set(key,{nome:d.nome,wpp:d.wpp,sex:d.sex,eventos:new Set()});
+        contatos.get(key).eventos.add(ev.data().nome);});
+    }
+  }
+  const all=[...contatos.values()].map(c=>({...c,eventos:[...c.eventos]})).sort((a,b)=>a.nome.toLowerCase().localeCompare(b.nome.toLowerCase()));
+  window.__bd=all;
+
+  const draw=(filter="")=>{
+    const f=filter.toLowerCase();
+    const arr=all.filter(c=>c.nome.toLowerCase().includes(f)||(c.wpp||"").includes(f));
+    $("#bdCount").textContent=`${arr.length} contatos`;
+    if(!arr.length){$("#bdList").innerHTML=`<div class="empty"><div class="ic">📇</div>Nenhum contato.</div>`;return;}
+    let h="";arr.forEach(c=>{h+=`<div class="list-item">
+      <span class="${sexClass(c.sex)}">${c.sex==="F"?"♀":c.sex==="M"?"♂":"⚧"}</span>
+      <div style="flex:1"><div class="nm">${esc(c.nome)}</div><div class="wpp">${esc(c.wpp)} · ${c.eventos.map(esc).join(", ")}</div></div>
+      <a class="btn btn-teal btn-sm" target="_blank" href="https://wa.me/55${(c.wpp||'').replace(/\D/g,'')}">wpp</a>
+    </div>`;});
+    $("#bdList").innerHTML=h;
+  };
+  draw();
+  $("#bdSearch").oninput=e=>draw(e.target.value);
+  $("#bdExp").onclick=()=>{let csv="Nome,WhatsApp,Sexo,Eventos\n";all.forEach(c=>csv+=`"${c.nome}","${c.wpp}","${sexLabel(c.sex)}","${c.eventos.join('; ')}"\n`);dl(csv,"banco-de-dados-listaoff.csv");};
+}
+
+/* ====================================================== */
+/* ===================  PORTARIA  ======================= */
+/* ====================================================== */
+async function renderPortariaPick(){
+  $("#modeTag").textContent="Portaria";
+  const p=new URLSearchParams(location.search);
+  if(p.get("ev")&&p.get("lista")) return renderPortariaLista(p.get("ev"),p.get("lista"));
+  if(p.get("ev")&&p.get("todas")) return renderPortariaUnificada(p.get("ev"));
+
+  app.innerHTML=`<h1 class="big" style="color:var(--green)">Portaria 🎟️</h1>
+    <p class="muted">Escolha o evento — veja todos os nomes juntos ou por lista</p>
+    <div id="ppEv" style="margin-top:16px"><div class="loader">carregando…</div></div>`;
+  const eventos=await FB.getDocs(FB.query(FB.collection(DB,"eventos"),FB.orderBy("criadoEm","desc")));
+  let h="";
+  for(const ev of eventos.docs){
+    const e=ev.data();
+    const listas=await FB.getDocs(FB.collection(DB,"eventos",ev.id,"listas"));
+    h+=`<div class="card"><h2 style="margin-bottom:4px">${esc(e.nome)}</h2>
+      <p class="muted" style="margin-bottom:12px">${e.data?new Date(e.data+'T00:00').toLocaleDateString('pt-BR'):''}</p>
+      <button class="btn btn-green" style="width:100%;margin-bottom:12px" onclick="go({v:'portaria',ev:'${ev.id}',todas:'1'})">
+        👥 Ver todos os nomes (lista unificada)</button>`;
+    if(listas.empty)h+=`<p class="muted">sem listas</p>`;
+    else{
+      h+=`<p class="muted" style="font-size:12px;margin-bottom:6px">ou check-in por lista:</p>`;
+      listas.forEach(l=>{h+=`<div class="event-row" onclick="go({v:'portaria',ev:'${ev.id}',lista:'${l.id}'})">
+        <div class="t" style="flex:1">${esc(l.data().nome)}</div><span class="pill pill-pink">check-in →</span></div>`;});
+    }
+    h+=`</div>`;
+  }
+  $("#ppEv").innerHTML=h||`<div class="empty"><div class="ic">🗓️</div>Nenhum evento.</div>`;
+}
+
+/* ===== PORTARIA: LISTA UNIFICADA (todos os nomes do evento) ===== */
+async function renderPortariaUnificada(evId){
+  const evSnap=await FB.getDoc(FB.doc(DB,"eventos",evId));
+  const ev=evSnap.data();
+  $("#modeTag").textContent="Check-in";
+  app.innerHTML=`
+    <button class="fab-back" onclick="go({v:'portaria'})">← trocar evento</button>
+    <h1 class="big" style="color:var(--green)">${esc(ev.nome)}</h1>
+    <p class="muted">Todos os nomes de todas as listas, em ordem alfabética</p>
+    <div class="stat-grid" id="ustats" style="margin:14px 0"></div>
+    <div class="search-box"><input id="uSearch" placeholder="buscar nome…" autofocus></div>
+    <div id="uList"><div class="loader">carregando…</div></div>`;
+
+  // carrega todas as listas e junta os cadastros
+  const listas=await FB.getDocs(FB.collection(DB,"eventos",evId,"listas"));
+  const nomeLista={}; listas.docs.forEach(l=>nomeLista[l.id]=l.data().nome);
+
+  let cache=[];
+  const draw=(filter="")=>{
+    const f=filter.toLowerCase();
+    const arr=cache.filter(c=>(c.nomeLower||"").includes(f));
+    let h="";
+    if(!arr.length)h=`<div class="empty"><div class="ic">🔍</div>Nenhum nome encontrado.</div>`;
+    arr.forEach(c=>{h+=`<div class="list-item ${c.checkin?'in':''}">
+      <span class="${sexClass(c.sex)}">${c.sex==="F"?"♀":c.sex==="M"?"♂":"⚧"}</span>
+      <div style="flex:1">
+        <div class="nm">${esc(c.nome)}</div>
+        <div class="wpp">${esc(c.wpp)} · <b style="color:var(--green)">${esc(nomeLista[c._lista]||"")}</b>${c._valor>0?` · ${fmtBRL(c._valor)}`:''}</div>
+      </div>
+      ${c.checkin
+        ? `<button class="btn btn-ghost btn-sm" onclick="setCheck('${evId}','${c._lista}','${c.id}',false)">desfazer</button>`
+        : `<button class="btn btn-primary btn-sm" onclick="setCheck('${evId}','${c._lista}','${c.id}',true)">✓ entrou</button>`}
+    </div>`;});
+    $("#uList").innerHTML=h;
+  };
+
+  // monta o cache com listeners de cada lista (ao vivo)
+  const refresh=async()=>{
+    const todos=[];
+    for(const l of listas.docs){
+      const cads=await FB.getDocs(FB.collection(DB,"eventos",evId,"listas",l.id,"cadastros"));
+      cads.forEach(d=>todos.push({id:d.id,_lista:l.id,_valor:l.data().valor||0,...d.data()}));
+    }
+    todos.sort((a,b)=>(a.nomeLower||"").localeCompare(b.nomeLower||""));
+    cache=todos;
+    const total=todos.length, ins=todos.filter(x=>x.checkin).length;
+    const f=todos.filter(x=>x.sex==="F").length, m=todos.filter(x=>x.sex==="M").length;
+    $("#ustats").innerHTML=`
+      <div class="stat"><div class="n">${ins}</div><div class="l">entraram</div></div>
+      <div class="stat"><div class="n">${total-ins}</div><div class="l">faltam</div></div>
+      <div class="stat"><div class="n">${f}</div><div class="l">fem</div></div>
+      <div class="stat"><div class="n">${m}</div><div class="l">masc</div></div>`;
+    draw($("#uSearch").value);
+  };
+  // ouve mudanças em cada lista pra atualizar ao vivo
+  listas.docs.forEach(l=>{
+    FB.onSnapshot(FB.collection(DB,"eventos",evId,"listas",l.id,"cadastros"),()=>refresh());
+  });
+  if(listas.empty){ $("#uList").innerHTML=`<div class="empty"><div class="ic">📝</div>Sem listas neste evento.</div>`; $("#ustats").innerHTML=""; }
+  $("#uSearch").oninput=e=>draw(e.target.value);
+}
+
+async function renderPortariaLista(evId,listaId){
+  const lSnap=await FB.getDoc(FB.doc(DB,"eventos",evId,"listas",listaId));
+  const L=lSnap.data();
+  $("#modeTag").textContent="Check-in";
+  app.innerHTML=`
+    <button class="fab-back" onclick="go({v:'portaria'})">← trocar lista</button>
+    <h1 class="big" style="color:var(--green)">${esc(L.nome)}</h1>
+    ${L.valor>0
+      ? `<span class="pill pill-pink" style="font-size:14px">Cobrar ${fmtBRL(L.valor)} de cada pessoa na entrada</span>`
+      : `<span class="pill pill-gray">Lista OFF · entrada grátis</span>`}
+    <div class="stat-grid" id="pstats" style="margin:14px 0"></div>
+    <div class="search-box"><input id="pSearch" placeholder="buscar nome…" autofocus></div>
+    <div id="pList"><div class="loader">carregando…</div></div>`;
+
+  let cache=[];
+  const draw=(filter="")=>{
+    const f=filter.toLowerCase();
+    const arr=cache.filter(c=>(c.nomeLower||"").includes(f));
+    let h="";
+    if(!arr.length)h=`<div class="empty"><div class="ic">🔍</div>Nenhum nome encontrado.</div>`;
+    arr.forEach(c=>{h+=`<div class="list-item ${c.checkin?'in':''}">
+      <span class="${sexClass(c.sex)}">${c.sex==="F"?"♀":c.sex==="M"?"♂":"⚧"}</span>
+      <div style="flex:1"><div class="nm">${esc(c.nome)}</div><div class="wpp">${esc(c.wpp)}</div></div>
+      ${c.checkin
+        ? `<button class="btn btn-ghost btn-sm" onclick="setCheck('${evId}','${listaId}','${c.id}',false)">desfazer</button>`
+        : `<button class="btn btn-primary btn-sm" onclick="setCheck('${evId}','${listaId}','${c.id}',true)">✓ entrou</button>`}
+    </div>`;});
+    $("#pList").innerHTML=h;
+  };
+
+  FB.onSnapshot(FB.collection(DB,"eventos",evId,"listas",listaId,"cadastros"),snap=>{
+    cache=[];snap.forEach(d=>cache.push({id:d.id,...d.data()}));
+    cache.sort((a,b)=>(a.nomeLower||"").localeCompare(b.nomeLower||""));
+    const total=cache.length, ins=cache.filter(x=>x.checkin).length;
+    $("#pstats").innerHTML=`
+      <div class="stat"><div class="n">${ins}</div><div class="l">entraram</div></div>
+      <div class="stat"><div class="n">${total-ins}</div><div class="l">faltam</div></div>
+      <div class="stat"><div class="n">${total}</div><div class="l">total</div></div>`;
+    draw($("#pSearch").value);
+  });
+  $("#pSearch").oninput=e=>draw(e.target.value);
+}
+window.setCheck=async(evId,listaId,cadId,val)=>{
+  await FB.updateDoc(FB.doc(DB,"eventos",evId,"listas",listaId,"cadastros",cadId),{checkin:val});
+};
+</script>
+</body>
+</html>
