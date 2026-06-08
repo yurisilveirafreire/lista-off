@@ -238,6 +238,7 @@ function sexClass(s){return s==="M"?"sex-m":s==="F"?"sex-f":"sex-o";}
 function fmtBRL(v){return "R$ "+Number(v||0).toFixed(2).replace(".",",");}
 function baseUrl(){return location.origin+location.pathname;}
 function fmtData(d){return d?new Date(d+'T00:00').toLocaleDateString('pt-BR'):'sem data';}
+function ordEvDocs(docs){return [...docs].sort((a,b)=>{const da=a.data().data||"",db=b.data().data||"";if(!da&&!db)return 0;if(!da)return 1;if(!db)return -1;return da<db?-1:da>db?1:0;});}
 
 // senhas / whatsapp (definidos no topo do arquivo)
 function toggleMenu(open){
@@ -447,6 +448,8 @@ function renderEventos(){
   watch(FB.query(FB.collection(DB,"eventos"),FB.orderBy("criadoEm","desc")),async snap=>{
     const docs=snap.docs;
     allEv=await Promise.all(docs.map(async d=>({id:d.id,_d:d.data(),_cont:await contarEvento(d.id)})));
+    // ordena pela data do evento (mais próximo primeiro); sem data vai pro fim
+    allEv.sort((a,b)=>{const da=a._d.data||"",db=b._d.data||""; if(!da&&!db)return 0; if(!da)return 1; if(!db)return -1; return da<db?-1:da>db?1:0;});
     draw($("#evBusca")?$("#evBusca").value:"");
   });
   // busca (delegada porque o input persiste)
@@ -672,7 +675,7 @@ async function renderBanco(){
     </div>`;
   const contatos=new Map();
   const eventos=await FB.getDocs(FB.collection(DB,"eventos"));
-  for(const ev of eventos.docs){
+  for(const ev of ordEvDocs(eventos.docs)){
     const listas=await FB.getDocs(FB.collection(DB,"eventos",ev.id,"listas"));
     for(const l of listas.docs){
       const cads=await FB.getDocs(FB.collection(DB,"eventos",ev.id,"listas",l.id,"cadastros"));
@@ -703,7 +706,7 @@ async function renderRelatorios(){
   const eventos=await FB.getDocs(FB.query(FB.collection(DB,"eventos"),FB.orderBy("criadoEm","desc")));
   if(eventos.empty){$("#relWrap").innerHTML=`<div class="empty"><div class="ic">📊</div>Nenhum evento ainda.</div>`;return;}
   let blocos=[];
-  for(const ev of eventos.docs){
+  for(const ev of ordEvDocs(eventos.docs)){
     const c=await contarEvento(ev.id); const e=ev.data();
     blocos.push(`<div class="ev-card"><div class="body">
       <div class="date">${fmtData(e.data)}</div><h3>${esc(e.nome)}</h3>
@@ -729,7 +732,7 @@ async function renderPortariaPick(){
   app.innerHTML=`<h1 class="page-title">Portaria 🎟️</h1><p class="muted" style="margin-bottom:16px">Escolha o evento — veja todos os nomes juntos ou por lista.</p><div id="ppEv"><div class="loader">carregando…</div></div>`;
   const eventos=await FB.getDocs(FB.query(FB.collection(DB,"eventos"),FB.orderBy("criadoEm","desc")));
   let h="";
-  for(const ev of eventos.docs){
+  for(const ev of ordEvDocs(eventos.docs)){
     const e=ev.data(); const listas=await FB.getDocs(FB.collection(DB,"eventos",ev.id,"listas"));
     h+=`<div class="card"><div class="date" style="color:var(--green);font-weight:700">${fmtData(e.data)}</div>
       <h3 style="font-size:18px;margin:2px 0 12px">${esc(e.nome)}</h3>
