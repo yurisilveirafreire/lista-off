@@ -238,7 +238,7 @@ function sexClass(s){return s==="M"?"sex-m":s==="F"?"sex-f":"sex-o";}
 function fmtBRL(v){return "R$ "+Number(v||0).toFixed(2).replace(".",",");}
 function baseUrl(){return location.origin+location.pathname;}
 function fmtData(d){return d?new Date(d+'T00:00').toLocaleDateString('pt-BR'):'sem data';}
-function ordEvDocs(docs){return [...docs].sort((a,b)=>{const da=a.data().data||"",db=b.data().data||"";if(!da&&!db)return 0;if(!da)return 1;if(!db)return -1;return da<db?-1:da>db?1:0;});}
+function ordEvDocs(docs){return [...docs].sort((a,b)=>{const da=a.data().data||"",db=b.data().data||"";if(!da&&!db)return 0;if(!da)return 1;if(!db)return -1;return da>db?-1:da<db?1:0;});}
 
 // senhas / whatsapp (definidos no topo do arquivo)
 function toggleMenu(open){
@@ -449,7 +449,7 @@ function renderEventos(){
     const docs=snap.docs;
     allEv=await Promise.all(docs.map(async d=>({id:d.id,_d:d.data(),_cont:await contarEvento(d.id)})));
     // ordena pela data do evento (mais próximo primeiro); sem data vai pro fim
-    allEv.sort((a,b)=>{const da=a._d.data||"",db=b._d.data||""; if(!da&&!db)return 0; if(!da)return 1; if(!db)return -1; return da<db?-1:da>db?1:0;});
+    allEv.sort((a,b)=>{const da=a._d.data||"",db=b._d.data||""; if(!da&&!db)return 0; if(!da)return 1; if(!db)return -1; return da>db?-1:da<db?1:0;});
     draw($("#evBusca")?$("#evBusca").value:"");
   });
   // busca (delegada porque o input persiste)
