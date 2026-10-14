@@ -3,7 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>LISTA OFF</title>
+<title>Perdido</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect x='26' y='26' width='460' height='460' rx='104' fill='%23FFE600' stroke='%230A0A0A' stroke-width='26'/><text x='256' y='368' font-family='Arial Black,Arial,sans-serif' font-size='340' font-weight='900' fill='%230A0A0A' text-anchor='middle'>P</text></svg>">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="theme-color" content="#FFE600">
+
 
 <!-- ============================================================= -->
 <!--  PASSO 1: COLE AQUI A CONFIG DO SEU PROJETO FIREBASE          -->
@@ -40,169 +44,186 @@
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root{
-  --blue:#4F76C7;
-  --blue-dark:#3E5FA8;
-  --teal:#16B8A6;
-  --green:#22B36B;
-  --green-soft:#E6F6EE;
-  --bg:#F4F6FA;
+  --yellow:#FFE600;
+  --yellow-soft:#FFF7B8;
+  --yellow-tint:#FFFBE0;
+  --ink:#0A0A0A;
+  --bg:#F3F3F1;
   --surface:#FFFFFF;
-  --surface-2:#F7F9FC;
-  --line:#E6EAF1;
-  --ink:#1F2A44;
-  --muted:#7A869A;
-  --accent:#4F76C7;
-  --danger:#E5484D;
-  --warn:#F5A623;
+  --surface-2:#FAFAF7;
+  --line:#E7E7E2;
+  --muted:#8A8A82;
+  --accent:#0A0A0A;
+  --danger:#E5433C;
+  --warn:#C98A00;
   --radius:14px;
   --sidebar:248px;
 }
 *{box-sizing:border-box;margin:0;padding:0}
 body{
-  font-family:'Plus Jakarta Sans',-apple-system,system-ui,sans-serif;
+  font-family:'Inter',-apple-system,system-ui,sans-serif;
   background:var(--bg);color:var(--ink);min-height:100vh;-webkit-font-smoothing:antialiased;
 }
-h1,h2,h3{font-family:'Plus Jakarta Sans',sans-serif;font-weight:700;letter-spacing:-.3px}
+h1,h2,h3,.disp{font-family:'Space Grotesk',sans-serif;font-weight:700;letter-spacing:-.4px}
 
 /* ===== LAYOUT SHELL ===== */
 .shell{display:flex;min-height:100vh}
 .sidebar{
-  width:var(--sidebar);background:var(--surface);border-right:1px solid var(--line);
+  width:var(--sidebar);background:var(--ink);border-right:1px solid #1c1c1a;
   display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:50;
   transition:transform .25s;
 }
-.sidebar .brand{padding:24px 22px;display:flex;align-items:center;gap:9px;border-bottom:1px solid var(--line)}
-.sidebar .brand .mark{font-weight:800;font-size:20px;color:var(--ink);letter-spacing:-.5px}
-.sidebar .brand .mark .off{background:var(--green);color:#fff;padding:1px 8px;border-radius:7px;margin-left:5px}
+.sidebar .brand{padding:24px 22px;display:flex;align-items:center;gap:9px;border-bottom:1px solid #1f1f1d}
+.sidebar .brand .mark{font-family:'Space Grotesk';font-weight:700;font-size:21px;color:#fff;letter-spacing:-.5px}
+.sidebar .brand .mark .off{background:var(--yellow);color:var(--ink);padding:1px 9px;border-radius:7px;margin-left:5px}
 .nav{padding:14px 12px;flex:1;display:flex;flex-direction:column;gap:4px}
 .nav a{
   display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:10px;
-  color:var(--muted);font-weight:600;font-size:14px;cursor:pointer;text-decoration:none;transition:.15s;
+  color:#9a9a90;font-weight:600;font-size:14px;cursor:pointer;text-decoration:none;transition:.15s;
 }
-.nav a:hover{background:var(--surface-2);color:var(--ink)}
-.nav a.active{background:var(--green-soft);color:var(--green)}
+.nav a:hover{background:#1a1a18;color:#fff}
+.nav a.active{background:var(--yellow);color:var(--ink);box-shadow:3px 3px 0 #000}
 .nav a .ic{width:20px;text-align:center;font-size:16px}
-.nav .sep{height:1px;background:var(--line);margin:10px 6px}
-.side-foot{padding:16px 18px;border-top:1px solid var(--line);font-size:12px;color:var(--muted)}
-.side-foot b{color:var(--ink);display:block;font-size:13px;margin-bottom:2px}
+.nav .sep{height:1px;background:#242422;margin:10px 6px}
+.side-foot{padding:16px 18px;border-top:1px solid #1f1f1d;font-size:12px;color:#7a7a72}
+.side-foot b{color:#e8e8e2;display:block;font-size:13px;margin-bottom:2px}
 
 .main{flex:1;margin-left:var(--sidebar);min-width:0}
 .topbar-m{display:none}
 .content{max-width:1000px;margin:0 auto;padding:30px 28px 90px}
-.page-title{font-size:26px;margin-bottom:22px;display:flex;align-items:center;gap:12px}
+.page-title{font-size:30px;margin-bottom:22px;display:flex;align-items:center;gap:12px}
 
 /* ===== COMPONENTES ===== */
-.btn{border:none;border-radius:10px;padding:12px 20px;font-family:inherit;font-weight:600;font-size:14px;cursor:pointer;transition:.16s;display:inline-flex;align-items:center;gap:8px;justify-content:center}
-.btn-primary{background:var(--blue);color:#fff}
-.btn-primary:hover{background:var(--blue-dark)}
-.btn-green{background:var(--green);color:#fff}
-.btn-green:hover{filter:brightness(1.05)}
-.btn-ghost{background:var(--surface);color:var(--ink);border:1px solid var(--line)}
-.btn-ghost:hover{border-color:var(--blue);color:var(--blue)}
-.btn-danger{background:#fff;color:var(--danger);border:1px solid #f3c9cb}
-.btn-danger:hover{background:var(--danger);color:#fff;border-color:var(--danger)}
-.btn-sm{padding:8px 14px;font-size:13px}
+.btn{border:2px solid var(--ink);border-radius:10px;padding:11px 19px;font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:14px;cursor:pointer;transition:.12s;display:inline-flex;align-items:center;gap:8px;justify-content:center;box-shadow:3px 3px 0 var(--ink)}
+.btn:hover{transform:translate(2px,2px);box-shadow:1px 1px 0 var(--ink)}
+.btn:active{transform:translate(3px,3px);box-shadow:0 0 0 var(--ink)}
+.btn-primary{background:var(--ink);color:var(--yellow)}
+.btn-green{background:var(--yellow);color:var(--ink)}
+.btn-ghost{background:var(--surface);color:var(--ink)}
+.btn-danger{background:#fff;color:var(--danger)}
+.btn-sm{padding:7px 13px;font-size:13px;box-shadow:2px 2px 0 var(--ink)}
+.btn-sm:hover{box-shadow:1px 1px 0 var(--ink)}
 .btn:disabled{opacity:.45;cursor:not-allowed}
 
-.card{background:var(--surface);border-radius:var(--radius);padding:24px;margin-bottom:18px;border:1px solid var(--line)}
+.card{background:var(--surface);border-radius:var(--radius);padding:24px;margin-bottom:18px;border:2px solid var(--ink);box-shadow:4px 4px 0 var(--ink)}
 
-input,select,textarea{width:100%;padding:12px 14px;border:1px solid var(--line);border-radius:10px;font-family:inherit;font-size:15px;background:var(--surface);color:var(--ink);transition:.15s}
+input,select,textarea{width:100%;padding:12px 14px;border:2px solid var(--ink);border-radius:10px;font-family:'Inter';font-size:15px;background:var(--surface);color:var(--ink);transition:.15s}
 textarea{resize:vertical;min-height:90px;line-height:1.5}
-input::placeholder,textarea::placeholder{color:#aab3c2}
-input:focus,select:focus,textarea:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(79,118,199,.12)}
+input::placeholder,textarea::placeholder{color:#b5b5ac}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--ink);box-shadow:3px 3px 0 var(--yellow)}
 label{font-weight:600;font-size:12px;display:block;margin:14px 0 6px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
 .row{display:flex;gap:12px;flex-wrap:wrap}
 .row>div{flex:1;min-width:140px}
 
-.pill{display:inline-flex;align-items:center;gap:6px;padding:4px 11px;border-radius:999px;font-size:12px;font-weight:600}
-.pill-blue{background:rgba(79,118,199,.12);color:var(--blue)}
-.pill-green{background:var(--green-soft);color:var(--green)}
-.pill-gray{background:var(--surface-2);color:var(--muted);border:1px solid var(--line)}
-.pill-amber{background:rgba(245,166,35,.14);color:#B57A11}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:4px 11px;border-radius:999px;font-size:12px;font-weight:700;border:1.5px solid var(--ink)}
+.pill-blue{background:var(--yellow-soft);color:#7a6a00}
+.pill-green{background:var(--ink);color:var(--yellow)}
+.pill-gray{background:var(--surface-2);color:#5a5a52}
+.pill-amber{background:var(--yellow);color:var(--ink)}
 
 .search-box{position:relative}
 .search-box input{padding-left:42px}
-.search-box::before{content:"⌕";position:absolute;left:14px;top:9px;font-size:21px;color:var(--muted)}
+.search-box::before{content:"\\2315";position:absolute;left:14px;top:9px;font-size:21px;color:var(--muted)}
 
 .muted{color:var(--muted);font-size:14px}
 .center{text-align:center}
 .hidden{display:none!important}
 
 .stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px;margin-bottom:18px}
-.stat{background:var(--surface);border-radius:12px;padding:16px;text-align:center;border:1px solid var(--line)}
-.stat .n{font-size:28px;font-weight:800;color:var(--blue);line-height:1}
+.stat{background:var(--surface);border-radius:12px;padding:16px;text-align:center;border:2px solid var(--ink);box-shadow:3px 3px 0 var(--ink)}
+.stat .n{font-family:'Space Grotesk';font-size:30px;font-weight:700;color:var(--ink);line-height:1;font-variant-numeric:tabular-nums}
 .stat .l{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-top:5px}
 
-/* ===== EVENT CARD (estilo VIPme) ===== */
-.ev-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);margin-bottom:14px;overflow:hidden;border-left:4px solid var(--green)}
+/* ===== EVENT CARD ===== */
+.ev-card{background:var(--surface);border:2px solid var(--ink);border-radius:var(--radius);margin-bottom:16px;overflow:hidden;border-left:8px solid var(--yellow);box-shadow:4px 4px 0 var(--ink)}
 .ev-card .body{padding:20px 22px}
-.ev-card .date{color:var(--green);font-weight:700;font-size:15px}
-.ev-card h3{font-size:19px;margin:2px 0 6px;color:var(--ink)}
+.ev-card .date{font-family:'Space Grotesk';color:var(--warn);font-weight:700;font-size:14px;font-variant-numeric:tabular-nums}
+.ev-card h3{font-size:21px;margin:2px 0 6px;color:var(--ink)}
 .ev-card .loc{color:var(--muted);font-size:13px;margin-bottom:12px}
 .ev-card .meta{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:4px}
 .ev-card .foot{display:flex;gap:8px;flex-wrap:wrap;padding:14px 22px;border-top:1px solid var(--line);background:var(--surface-2)}
 
-.list-row{display:flex;align-items:center;gap:12px;padding:13px 14px;border-radius:10px;border:1px solid var(--line);margin-bottom:8px;background:var(--surface);transition:.15s}
-.list-row.in{background:var(--green-soft);border-color:#bfe6d2}
+.list-row{display:flex;align-items:center;gap:12px;padding:13px 14px;border-radius:10px;border:2px solid var(--ink);margin-bottom:9px;background:var(--surface);transition:.12s;box-shadow:2px 2px 0 var(--ink)}
+.list-row.in{background:var(--yellow-tint);border-color:#f0e08a}
 .list-row .nm{font-weight:600;flex:1}
 .list-row .wpp{font-size:13px;color:var(--muted)}
 .sex-m{color:#3B82F6}.sex-f{color:#E0539B}.sex-o{color:var(--muted)}
 
-.linkbox{display:flex;gap:8px;align-items:center;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:8px 8px 8px 12px;margin-top:10px}
-.linkbox input{border:none;background:transparent;font-size:13px;padding:4px;color:var(--blue)}
+.linkbox{display:flex;gap:8px;align-items:center;background:var(--surface-2);border:2px solid var(--ink);border-radius:10px;padding:8px 8px 8px 12px;margin-top:10px}
+.linkbox input{border:none;background:transparent;font-size:13px;padding:4px;color:var(--ink);font-weight:500}
 .linkbox input:focus{box-shadow:none}
 
-.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(120px);background:var(--ink);color:#fff;padding:13px 22px;border-radius:10px;font-weight:600;font-size:14px;transition:.3s;z-index:999;box-shadow:0 10px 30px -8px rgba(0,0,0,.3)}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(120px);background:var(--ink);color:var(--yellow);padding:13px 22px;border-radius:10px;font-weight:700;font-family:'Space Grotesk';font-size:14px;transition:.3s;z-index:999;box-shadow:0 10px 30px -8px rgba(0,0,0,.3)}
 .toast.show{transform:translateX(-50%) translateY(0)}
 
 .fab-back{background:none;border:none;color:var(--muted);font-weight:600;cursor:pointer;font-size:14px;margin-bottom:16px;display:inline-flex;gap:6px;align-items:center}
-.fab-back:hover{color:var(--blue)}
+.fab-back:hover{color:var(--ink)}
 .loader{text-align:center;padding:40px;color:var(--muted)}
 .empty{text-align:center;padding:46px 20px;color:var(--muted)}
 .empty .ic{font-size:42px;margin-bottom:10px;opacity:.4}
 
 /* ===== MODAL ===== */
-.modal-bg{position:fixed;inset:0;background:rgba(20,28,46,.5);display:flex;align-items:center;justify-content:center;z-index:200;padding:20px}
-.modal{background:var(--surface);border-radius:16px;padding:26px;max-width:460px;width:100%;max-height:90vh;overflow:auto}
-.modal h2{font-size:21px;margin-bottom:4px}
+.modal-bg{position:fixed;inset:0;background:rgba(10,10,10,.55);display:flex;align-items:center;justify-content:center;z-index:200;padding:20px}
+.modal{background:var(--surface);border:3px solid var(--ink);border-radius:16px;padding:26px;max-width:460px;width:100%;max-height:90vh;overflow:auto;box-shadow:6px 6px 0 var(--ink)}
+.modal h2{font-size:22px;margin-bottom:4px}
 
-/* ===== LANDING (3 acessos) ===== */
+/* ===== LANDING + PÚBLICO (vibe pista) ===== */
 .landing-wrap{max-width:560px;margin:0 auto;padding:60px 24px}
 .hero{text-align:center;margin-bottom:34px}
-.hero .mark{font-weight:800;font-size:40px;letter-spacing:-1.5px;color:var(--ink)}
-.hero .mark .off{background:var(--green);color:#fff;padding:0 14px;border-radius:12px}
+.hero .mark{font-family:'Space Grotesk';font-weight:700;font-size:46px;letter-spacing:-2px;color:var(--ink)}
+.hero .mark .off{background:var(--yellow);color:var(--ink);padding:0 14px;border-radius:12px}
 .hero p{color:var(--muted);margin-top:12px;font-size:16px}
-.access-card{display:flex;align-items:center;gap:16px;padding:22px;border-radius:var(--radius);background:var(--surface);border:1px solid var(--line);margin-bottom:14px;cursor:pointer;transition:.18s;text-align:left;width:100%;font-family:inherit}
-.access-card:hover{transform:translateY(-2px);border-color:var(--blue);box-shadow:0 14px 30px -16px rgba(79,118,199,.4)}
-.access-card .ico{width:52px;height:52px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:24px;flex:none}
-.access-card .ico.b{background:rgba(79,118,199,.12)}
-.access-card .ico.g{background:var(--green-soft)}
+.access-card{display:flex;align-items:center;gap:16px;padding:22px;border-radius:var(--radius);background:var(--surface);border:2px solid var(--ink);margin-bottom:16px;cursor:pointer;transition:.12s;text-align:left;width:100%;font-family:inherit;box-shadow:4px 4px 0 var(--ink)}
+.access-card:hover{transform:translate(2px,2px);box-shadow:1px 1px 0 var(--ink)}
+.access-card .ico{width:52px;height:52px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:24px;flex:none;border:2px solid var(--ink)}
+.access-card .ico.b{background:var(--yellow-tint)}
+.access-card .ico.g{background:var(--yellow)}
 .access-card .txt{flex:1}
 .access-card .txt h3{font-size:18px;margin-bottom:2px}
 .access-card .txt p{color:var(--muted);font-size:13px}
-.access-card .arr{color:var(--blue);font-size:20px}
+.access-card .arr{color:var(--ink);font-size:20px}
 .admin-foot{text-align:center;margin-top:26px}
 .admin-foot button{background:none;border:none;color:var(--muted);font-size:12px;cursor:pointer;opacity:.6;letter-spacing:.5px;text-transform:uppercase;font-weight:600}
-.admin-foot button:hover{opacity:1;color:var(--blue)}
+.admin-foot button:hover{opacity:1;color:var(--ink)}
 
 .login-wrap{max-width:400px;margin:60px auto;padding:0 20px}
+
+/* ===== PÚBLICO: tela preta "tá na lista" ===== */
+body.pub-mode{background:var(--ink)}
+body.pub-mode .sidebar,body.pub-mode .topbar-m,body.pub-mode .backdrop{display:none!important}
+body.pub-mode .main{margin-left:0!important}
+body.pub-mode .content{max-width:none;margin:0;padding:0}
+.pub-stage{min-height:100vh;background:var(--ink);color:#fff;padding:0}
+.pub-wrap{max-width:460px;margin:0 auto;padding:32px 22px 60px}
+.pub-logo{font-family:'Space Grotesk';font-weight:700;color:var(--yellow);font-size:15px;letter-spacing:.5px;margin-bottom:38px}
+.pub-ev{font-family:'Inter';font-size:12px;font-weight:600;color:#8a8a82;text-transform:uppercase;letter-spacing:.8px}
+.pub-h1{font-family:'Space Grotesk';font-weight:700;font-size:clamp(34px,10vw,52px);line-height:.95;letter-spacing:-2px;color:#fff;margin:8px 0}
+.pub-h1 .hl{background:var(--yellow);color:var(--ink);padding:0 10px;display:inline-block}
+.pub-card{background:#141412;border:2px solid var(--yellow);border-radius:16px;padding:22px;margin-top:26px;box-shadow:6px 6px 0 var(--yellow)}
+.pub-card label{color:#9a9a90}
+.pub-card input,.pub-card select{background:#0e0e0c;border:2px solid #3a3a36;color:#fff}
+.pub-card input::placeholder{color:#5a5a52}
+.pub-card input:focus,.pub-card select:focus{border-color:var(--yellow);box-shadow:3px 3px 0 var(--yellow)}
+.pub-done{background:var(--yellow);color:var(--ink);border:3px solid var(--ink);border-radius:16px;padding:30px 22px;text-align:center;margin-top:26px;box-shadow:7px 7px 0 var(--ink)}
+.pub-done h2{font-family:'Space Grotesk';font-size:30px;font-weight:700;letter-spacing:-1px}
 
 /* ===== MOBILE ===== */
 .menu-btn{display:none}
 .backdrop{display:none}
 @media(max-width:820px){
-  .sidebar{transform:translateX(-100%);box-shadow:0 0 40px rgba(0,0,0,.2)}
+  .sidebar{transform:translateX(-100%);box-shadow:0 0 40px rgba(0,0,0,.3)}
   .sidebar.open{transform:translateX(0)}
   .main{margin-left:0}
-  .topbar-m{display:flex;align-items:center;gap:12px;padding:14px 18px;background:var(--surface);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:40}
-  .topbar-m .mark{font-weight:800;font-size:18px}
-  .topbar-m .mark .off{background:var(--green);color:#fff;padding:1px 7px;border-radius:6px;margin-left:4px}
-  .menu-btn{display:inline-flex;background:none;border:none;font-size:24px;cursor:pointer;color:var(--ink);line-height:1}
-  .backdrop.show{display:block;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:45}
+  .topbar-m{display:flex;align-items:center;gap:12px;padding:14px 18px;background:var(--ink);border-bottom:1px solid #1f1f1d;position:sticky;top:0;z-index:40}
+  .topbar-m .mark{font-family:'Space Grotesk';font-weight:700;font-size:18px;color:#fff}
+  .topbar-m .mark .off{background:var(--yellow);color:var(--ink);padding:1px 7px;border-radius:6px;margin-left:4px}
+  .menu-btn{display:inline-flex;background:none;border:none;font-size:24px;cursor:pointer;color:#fff;line-height:1}
+  .backdrop.show{display:block;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:45}
   .content{padding:20px 16px 80px}
+  .page-title{font-size:25px}
   .stat-grid{grid-template-columns:repeat(2,1fr)}
 }
 </style>
@@ -211,14 +232,14 @@ label{font-weight:600;font-size:12px;display:block;margin:14px 0 6px;color:var(-
 <div class="shell">
   <div class="backdrop" id="backdrop" onclick="toggleMenu(false)"></div>
   <aside class="sidebar" id="sidebar">
-    <div class="brand"><span class="mark">LISTA<span class="off">OFF</span></span></div>
+    <div class="brand"><span class="mark">PERDIDO<span class="off">off</span></span></div>
     <nav class="nav" id="nav"></nav>
     <div class="side-foot" id="sideFoot"></div>
   </aside>
   <div class="main">
     <div class="topbar-m">
       <button class="menu-btn" onclick="toggleMenu(true)">☰</button>
-      <span class="mark">LISTA<span class="off">OFF</span></span>
+      <span class="mark">PERDIDO<span class="off">off</span></span>
     </div>
     <div class="content" id="app"><div class="loader">carregando…</div></div>
   </div>
@@ -251,6 +272,7 @@ function route(){
   clearWatchers();
   if(window._clearListeners) window._clearListeners();
   toggleMenu(false);
+  document.body.classList.remove("pub-mode");
   const p = new URLSearchParams(location.search);
   const v = p.get("v");
   // público (link de cadastro)
@@ -313,8 +335,8 @@ function renderLanding(){
   app.closest(".main").style.marginLeft="0";
   app.innerHTML=`<div class="landing-wrap">
     <div class="hero">
-      <div class="mark">LISTA<span class="off">OFF</span></div>
-      <p>O jeito mais rápido de gerenciar listas do seu rolê.</p>
+      <div class="mark">PERDIDO<span class="off">off</span></div>
+      <p>Tudo começa com um perdido. Gerencie as listas do seu rolê.</p>
     </div>
     <button class="access-card" onclick="go({v:'portaria'})">
       <div class="ico b">🎟️</div>
@@ -323,7 +345,7 @@ function renderLanding(){
     </button>
     <button class="access-card" onclick="go({v:'parceiro'})">
       <div class="ico g">🚀</div>
-      <div class="txt"><h3>Quero a Lista OFF no meu evento</h3><p>Fale com a gente e comece a usar.</p></div>
+      <div class="txt"><h3>Quero o Perdido no meu rolê</h3><p>Fale com a gente e comece a usar.</p></div>
       <div class="arr">→</div>
     </button>
     <div class="admin-foot"><button onclick="go({v:'admin'})">· admin geral ·</button></div>
@@ -819,31 +841,33 @@ window.setCheck=async(evId,listaId,cadId,val)=>{await FB.updateDoc(FB.doc(DB,"ev
 /* =================== PÁGINA PÚBLICA =================== */
 async function renderPublic(evId,listaId){
   showShell(false);
-  app.innerHTML=`<div class="loader">carregando lista…</div>`;
+  document.body.classList.add("pub-mode");
+  app.innerHTML=`<div class="pub-stage"><div class="pub-wrap"><div class="loader" style="color:#8a8a82">carregando…</div></div></div>`;
   try{
     const evSnap=await FB.getDoc(FB.doc(DB,"eventos",evId));
     const lSnap=await FB.getDoc(FB.doc(DB,"eventos",evId,"listas",listaId));
-    if(!evSnap.exists()||!lSnap.exists()){app.innerHTML=`<div class="login-wrap"><div class="card center"><h2>Lista não encontrada</h2></div></div>`;return;}
+    if(!evSnap.exists()||!lSnap.exists()){app.innerHTML=pub(`<h1 class="pub-h1">Lista não<br>encontrada</h1>`);return;}
     const ev=evSnap.data(),L=lSnap.data();
     const now=Date.now(),ini=L.inicio?new Date(L.inicio).getTime():null,fim=L.fim?new Date(L.fim).getTime():null;
-    if(ini&&now<ini){app.innerHTML=pub(`<h2>A lista ainda não abriu ⏳</h2><p class="muted">Abre em ${fmtDT(L.inicio)}</p>`);return;}
-    if(fim&&now>fim){app.innerHTML=pub(`<h2>Lista encerrada 🚫</h2><p class="muted">Fechou em ${fmtDT(L.fim)}</p>`);return;}
-    if(L.limite&&L.limite>0){const c=await FB.getDocs(FB.collection(DB,"eventos",evId,"listas",listaId,"cadastros"));if(c.size>=L.limite){app.innerHTML=pub(`<h2>Lista lotada 😱</h2><p class="muted">Todas as vagas foram preenchidas.</p>`);return;}}
-    app.innerHTML=`<div class="login-wrap">
-      <div class="card center">
-        <span class="pill pill-green">${esc(ev.nome)}${ev.data?` · ${fmtData(ev.data)}`:''}</span>
-        <h1 style="font-size:26px;margin-top:14px;color:var(--blue)">${esc(L.nome)}</h1>
-        ${L.valor>0?`<div style="margin-top:8px"><span class="pill pill-amber">Entrada ${fmtBRL(L.valor)} · paga na portaria</span></div>`:`<div style="margin-top:8px"><span class="pill pill-gray">Lista OFF · grátis</span></div>`}
-        ${ev.local?`<p class="muted" style="margin-top:10px">📍 ${esc(ev.local)}</p>`:''}
-        ${ev.descricao?`<p class="muted" style="margin-top:6px;white-space:pre-line">${esc(ev.descricao)}</p>`:''}
+    if(ini&&now<ini){app.innerHTML=pub(`<h1 class="pub-h1">Calma,<br><span class="hl">ainda não abriu</span></h1><p style="color:#9a9a90;margin-top:14px">Abre em ${fmtDT(L.inicio)}</p>`);return;}
+    if(fim&&now>fim){app.innerHTML=pub(`<h1 class="pub-h1">Lista<br><span class="hl">encerrada</span></h1><p style="color:#9a9a90;margin-top:14px">Fechou em ${fmtDT(L.fim)}</p>`);return;}
+    if(L.limite&&L.limite>0){const c=await FB.getDocs(FB.collection(DB,"eventos",evId,"listas",listaId,"cadastros"));if(c.size>=L.limite){app.innerHTML=pub(`<h1 class="pub-h1">Lotou!<br><span class="hl">deu ruim</span></h1><p style="color:#9a9a90;margin-top:14px">Todas as vagas foram preenchidas.</p>`);return;}}
+    app.innerHTML=`<div class="pub-stage"><div class="pub-wrap">
+      <div class="pub-logo">PERDIDO</div>
+      <div class="pub-ev">${esc(ev.nome)}${ev.data?` · ${fmtData(ev.data)}`:''}</div>
+      <h1 class="pub-h1">${esc(L.nome)}</h1>
+      <div style="margin-top:14px">
+        ${L.valor>0?`<span class="pill pill-amber">Entrada ${fmtBRL(L.valor)} · paga na portaria</span>`:`<span class="pill" style="background:#1c1c1a;color:#9a9a90">Entrada grátis</span>`}
       </div>
-      <div class="card" id="formCard">
-        <h2 style="font-size:17px;margin-bottom:8px">Adicione seu nome na lista</h2>
+      ${ev.local?`<p style="color:#9a9a90;margin-top:12px;font-size:14px">📍 ${esc(ev.local)}</p>`:''}
+      ${ev.descricao?`<p style="color:#9a9a90;margin-top:6px;font-size:14px;white-space:pre-line">${esc(ev.descricao)}</p>`:''}
+      <div class="pub-card" id="formCard">
+        <h2 style="font-family:'Space Grotesk';font-size:18px;color:#fff;margin-bottom:10px">Bota teu nome na lista</h2>
         <label>Nome completo</label><input id="pNome" placeholder="Seu nome completo" autocomplete="name">
         <label>WhatsApp (com DDD)</label><input id="pWpp" placeholder="(38) 9 9999-9999" inputmode="tel">
         <label>Sexo</label><select id="pSex"><option value="">Selecione…</option><option value="F">Feminino</option><option value="M">Masculino</option><option value="O">Outro</option></select>
-        <button class="btn btn-green" style="width:100%;margin-top:20px" id="pSend">Entrar na lista</button>
-      </div></div>`;
+        <button class="btn btn-green" style="width:100%;margin-top:20px" id="pSend">Bora, tô dentro →</button>
+      </div></div></div>`;
     $("#pSend").onclick=async()=>{
       const nome=$("#pNome").value.trim(),wpp=$("#pWpp").value.trim(),sex=$("#pSex").value;
       if(nome.length<3) return toast("Digite seu nome completo");
@@ -852,15 +876,16 @@ async function renderPublic(evId,listaId){
       $("#pSend").disabled=true;$("#pSend").textContent="enviando…";
       try{
         await FB.addDoc(FB.collection(DB,"eventos",evId,"listas",listaId,"cadastros"),{nome,nomeLower:nome.toLowerCase(),wpp,sex,checkin:false,criadoEm:FB.serverTimestamp()});
-        $("#formCard").outerHTML=`<div class="card center" style="background:var(--green-soft);border-color:#bfe6d2">
-          <h2 style="color:var(--green)">Tá na lista! ✅</h2>
-          ${L.valor>0?`<p style="font-weight:700;font-size:17px;margin-top:6px">Pagamento de ${fmtBRL(L.valor)} na portaria</p><p class="muted" style="margin-top:6px">${esc(nome)}, é só chegar, falar seu nome e pagar na entrada.</p>`:`<p class="muted" style="margin-top:6px">${esc(nome)}, é só chegar e falar seu nome na portaria.</p>`}
-          <span class="pill pill-blue" style="margin-top:14px">${esc(ev.nome)} · ${esc(L.nome)}</span></div>`;
-      }catch(e){console.error(e);toast("Erro ao enviar, tente de novo");$("#pSend").disabled=false;$("#pSend").textContent="Entrar na lista";}
+        const primeiro=esc(nome.split(" ")[0]);
+        $("#formCard").outerHTML=`<div class="pub-done">
+          <h2>CÊ TÁ NA LISTA ✅</h2>
+          ${L.valor>0?`<p style="font-family:'Space Grotesk';font-weight:700;font-size:18px;margin-top:8px">Paga ${fmtBRL(L.valor)} na portaria</p><p style="margin-top:6px;font-size:14px">${primeiro}, é só chegar, falar seu nome e pagar na entrada.</p>`:`<p style="margin-top:8px;font-size:14px">${primeiro}, é só chegar e falar seu nome na portaria.</p>`}
+          <div style="margin-top:16px;font-size:13px;font-weight:600;opacity:.7">${esc(ev.nome)} · ${esc(L.nome)}</div></div>`;
+      }catch(e){console.error(e);toast("Erro ao enviar, tente de novo");$("#pSend").disabled=false;$("#pSend").textContent="Bora, tô dentro →";}
     };
-  }catch(e){console.error(e);app.innerHTML=pub(`<h2>Erro ao carregar</h2><p class="muted">${esc(e.message)}</p>`);}
+  }catch(e){console.error(e);app.innerHTML=pub(`<h1 class="pub-h1">Erro ao<br>carregar</h1><p style="color:#9a9a90;margin-top:14px">${esc(e.message)}</p>`);}
 }
-function pub(html){return `<div class="login-wrap"><div class="card center">${html}</div></div>`;}
+function pub(html){document.body.classList.add("pub-mode");return `<div class="pub-stage"><div class="pub-wrap"><div class="pub-logo">PERDIDO</div>${html}</div></div>`;}
 function fmtDT(d){if(!d)return"";return new Date(d).toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"});}
 
 /* =================== MODAL HELPERS =================== */
