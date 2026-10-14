@@ -3,10 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Perdido</title>
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect x='26' y='26' width='460' height='460' rx='104' fill='%23FFE600' stroke='%230A0A0A' stroke-width='26'/><text x='256' y='368' font-family='Arial Black,Arial,sans-serif' font-size='340' font-weight='900' fill='%230A0A0A' text-anchor='middle'>P</text></svg>">
+<title>LISTA OFF</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect x='26' y='26' width='460' height='460' rx='104' fill='%23FF5C00' stroke='%23120D08' stroke-width='26'/><text x='256' y='368' font-family='Arial Black,Arial,sans-serif' font-size='300' font-weight='900' fill='%23120D08' text-anchor='middle'>L</text></svg>">
 <link rel="apple-touch-icon" href="icon-180.png">
-<meta name="theme-color" content="#FFE600">
+<meta name="theme-color" content="#FF5C00">
 
 
 <!-- ============================================================= -->
@@ -22,23 +22,39 @@
     messagingSenderId: "1012523540738",
     appId: "1:1012523540738:web:8c6c4d7f2f4f1c4fc0221b"
   };
-  // SENHA DO ADMIN GERAL (troque para o que quiser)
-  const SENHA_ADMIN = "madala@417";
-  // SENHA DA PORTARIA
+  // SENHA DA PORTARIA (equipe acessa por link + senha)
   const SENHA_PORTARIA = "madala@417";
+  // SENHA DO ADMIN GERAL (mantida p/ compatibilidade do acesso antigo)
+  const SENHA_ADMIN = "madala@417";
+  // E-MAIL DO ADMIN GERAL (vê tudo e libera contas grátis)
+  const ADMIN_GERAL = "yurisilveirafreire@hotmail.com";
+  // PACOTES DE CRÉDITO (1 crédito = 1 evento). priceId preenchido na etapa Stripe.
+  const PACOTES = [
+    { id:"c1",  eventos:1,  preco:9.90,  priceId:"COLE_PRICE_1" },
+    { id:"c5",  eventos:5,  preco:44.50, priceId:"COLE_PRICE_5" },
+    { id:"c10", eventos:10, preco:59.00, priceId:"COLE_PRICE_10" },
+  ];
+  // URL da Firebase Function de checkout (preenchida na etapa Stripe)
+  const CHECKOUT_FN = "COLE_URL_CHECKOUT";
 </script>
 
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
   import {
     getFirestore, collection, doc, addDoc, getDoc, getDocs, updateDoc,
-    deleteDoc, onSnapshot, query, where, orderBy, serverTimestamp, setDoc
+    deleteDoc, onSnapshot, query, where, orderBy, serverTimestamp, setDoc, increment
   } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+  import {
+    getAuth, onAuthStateChanged, createUserWithEmailAndPassword,
+    signInWithEmailAndPassword, signOut, sendPasswordResetEmail, updateProfile
+  } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
 
   const app = initializeApp(firebaseConfig);
   const db = getFirestore(app);
+  const auth = getAuth(app);
   // expõe pro resto do script (não-module) abaixo
-  window._fb = { db, collection, doc, addDoc, getDoc, getDocs, updateDoc, deleteDoc, onSnapshot, query, where, orderBy, serverTimestamp, setDoc };
+  window._fb = { db, collection, doc, addDoc, getDoc, getDocs, updateDoc, deleteDoc, onSnapshot, query, where, orderBy, serverTimestamp, setDoc, increment };
+  window._auth = { auth, onAuthStateChanged, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, sendPasswordResetEmail, updateProfile };
   window.dispatchEvent(new Event("fb-ready"));
 </script>
 
@@ -47,18 +63,19 @@
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root{
-  --yellow:#FFE600;
-  --yellow-soft:#FFF7B8;
-  --yellow-tint:#FFFBE0;
-  --ink:#0A0A0A;
-  --bg:#F3F3F1;
+  /* LISTA OFF — laranja (nomes --yellow mantidos p/ compatibilidade) */
+  --yellow:#FF5C00;
+  --yellow-soft:#FFE7D6;
+  --yellow-tint:#FFF1E6;
+  --ink:#120D08;
+  --bg:#FFF8F2;
   --surface:#FFFFFF;
-  --surface-2:#FAFAF7;
-  --line:#E7E7E2;
-  --muted:#8A8A82;
-  --accent:#0A0A0A;
+  --surface-2:#FFF3EA;
+  --line:#F0E2D5;
+  --muted:#8A7E72;
+  --accent:#120D08;
   --danger:#E5433C;
-  --warn:#C98A00;
+  --warn:#C24E00;
   --radius:14px;
   --sidebar:248px;
 }
@@ -119,13 +136,13 @@ label{font-weight:600;font-size:12px;display:block;margin:14px 0 6px;color:var(-
 .row>div{flex:1;min-width:140px}
 
 .pill{display:inline-flex;align-items:center;gap:6px;padding:4px 11px;border-radius:999px;font-size:12px;font-weight:700;border:1.5px solid var(--ink)}
-.pill-blue{background:var(--yellow-soft);color:#7a6a00}
+.pill-blue{background:var(--yellow-soft);color:#9a4500}
 .pill-green{background:var(--ink);color:var(--yellow)}
 .pill-gray{background:var(--surface-2);color:#5a5a52}
 .pill-amber{background:var(--yellow);color:var(--ink)}
 
 .search-box{position:relative}
-.search-box input{padding-left:40px}
+.search-box input{padding-left:42px}
 .search-box::before{content:"🔍";position:absolute;left:14px;top:12px;font-size:15px;opacity:.6}
 
 .muted{color:var(--muted);font-size:14px}
@@ -232,14 +249,14 @@ body.pub-mode .content{max-width:none;margin:0;padding:0}
 <div class="shell">
   <div class="backdrop" id="backdrop" onclick="toggleMenu(false)"></div>
   <aside class="sidebar" id="sidebar">
-    <div class="brand"><span class="mark">PERDIDO<span class="off">off</span></span></div>
+    <div class="brand"><span class="mark">LISTA<span class="off">OFF</span></span></div>
     <nav class="nav" id="nav"></nav>
     <div class="side-foot" id="sideFoot"></div>
   </aside>
   <div class="main">
     <div class="topbar-m">
       <button class="menu-btn" onclick="toggleMenu(true)">☰</button>
-      <span class="mark">PERDIDO<span class="off">off</span></span>
+      <span class="mark">LISTA<span class="off">OFF</span></span>
     </div>
     <div class="content" id="app"><div class="loader">carregando…</div></div>
   </div>
@@ -279,7 +296,9 @@ function route(){
   if(p.get("lista") && !p.get("admin")) return renderPublic(p.get("ev"), p.get("lista"));
   if(v==="portaria") return guardPortaria();
   if(v==="parceiro") return renderParceiro();
-  if(v==="admin"||v==="banco"||v==="relatorios" || (p.get("ev")&&!p.get("lista"))) return guardAdmin();
+  if(v==="login") return renderLogin();
+  if(v==="geral") return guardAdmin(()=>renderAdminGeral());
+  if(v==="painel"||v==="admin"||v==="banco"||v==="relatorios" || (p.get("ev")&&!p.get("lista"))) return guardAdmin();
   return renderLanding();
 }
 function go(params){
@@ -295,13 +314,35 @@ function watch(ref, cb){ const unsub=FB.onSnapshot(ref, cb); _watchers.push(unsu
 function clearWatchers(){ _watchers.forEach(u=>{try{u&&u()}catch(e){}}); _watchers=[]; }
 
 /* =================== FIREBASE READY =================== */
+let AUTH, CURRENT_USER=null, CURRENT_CONTA=null, _authReady=false;
+function isAdminGeral(){ return CURRENT_USER && CURRENT_USER.email && CURRENT_USER.email.toLowerCase()===ADMIN_GERAL.toLowerCase(); }
 function onFbReady(){
-  FB=window._fb; DB=FB.db;
+  FB=window._fb; DB=FB.db; AUTH=window._auth;
   if(firebaseConfig.apiKey==="COLE_AQUI"){
     document.querySelector(".shell").innerHTML=`<div class="content"><div class="card center"><h2>⚠️ Falta configurar o Firebase</h2><p class="muted" style="margin-top:8px">Cole a config do seu projeto Firebase no topo do arquivo (bloco PASSO 1) e suba de novo.</p></div></div>`;
     return;
   }
-  route();
+  // observa login/logout do dono
+  AUTH.onAuthStateChanged(AUTH.auth, async(user)=>{
+    CURRENT_USER=user||null; CURRENT_CONTA=null;
+    if(user){
+      // garante doc da conta
+      const ref=FB.doc(DB,"contas",user.uid);
+      const snap=await FB.getDoc(ref);
+      if(!snap.exists()){
+        await FB.setDoc(ref,{email:user.email,nome:user.displayName||"",creditos:0,gratis:false,criadoEm:FB.serverTimestamp()});
+        CURRENT_CONTA={email:user.email,nome:user.displayName||"",creditos:0,gratis:false};
+      } else CURRENT_CONTA=snap.data();
+    }
+    _authReady=true;
+    route();
+  });
+}
+// recarrega a conta do dono (saldo de créditos etc.)
+async function reloadConta(){
+  if(!CURRENT_USER) return;
+  const snap=await FB.getDoc(FB.doc(DB,"contas",CURRENT_USER.uid));
+  if(snap.exists()) CURRENT_CONTA=snap.data();
 }
 window.addEventListener("fb-ready", ()=>{ window._readyFired=true; });
 // roda o app só quando a página inteira (todos os scripts) terminou de carregar
@@ -316,13 +357,19 @@ function renderSidebar(active){
     {k:"portaria",ic:"🎟️", label:"Portaria"},
     {k:"banco",   ic:"📇", label:"Banco de Dados"},
     {k:"relatorios",ic:"📊",label:"Relatórios"},
+    {k:"painel",  ic:"💳", label:"Créditos"},
   ];
+  if(isAdminGeral()) items.push({k:"geral",ic:"👑",label:"Admin Geral"});
   $("#nav").innerHTML = items.map(i=>
     `<a class="${active===i.k?'active':''}" onclick="go({v:'${i.k}'})"><span class="ic">${i.ic}</span>${i.label}</a>`
   ).join("") + `<div class="sep"></div>
-    <a onclick="go({})"><span class="ic">↩︎</span>Tela inicial</a>`;
-  $("#sideFoot").innerHTML=`<b>Admin Geral</b>logado`;
+    <a onclick="go({})"><span class="ic">↩︎</span>Tela inicial</a>
+    <a onclick="sairConta()"><span class="ic">⎋</span>Sair da conta</a>`;
+  const c=CURRENT_CONTA||{}; const nome=(c.nome||CURRENT_USER&&CURRENT_USER.email||"").split(" ")[0]||"Conta";
+  const cred = c.gratis ? '<span style="color:var(--yellow)">grátis ✦</span>' : `${c.creditos||0} crédito${(c.creditos||0)===1?'':'s'}`;
+  $("#sideFoot").innerHTML=`<b>${esc(nome)}</b>${cred}`;
 }
+window.sairConta=async()=>{ try{ await AUTH.signOut(AUTH.auth); }catch(e){} sessionStorage.removeItem("adminOk"); toast("Você saiu"); go({}); };
 function showShell(show){
   document.querySelector(".sidebar").style.display = show?"":"none";
   document.querySelector(".topbar-m").style.display = show?"":"none";
@@ -335,8 +382,8 @@ function renderLanding(){
   app.closest(".main").style.marginLeft="0";
   app.innerHTML=`<div class="landing-wrap">
     <div class="hero">
-      <div class="mark">PERDIDO<span class="off">off</span></div>
-      <p>Tudo começa com um perdido. Gerencie as listas do seu rolê.</p>
+      <div class="mark">LISTA<span class="off">OFF</span></div>
+      <p>A lista do seu rolê, sem papel. Gerencie tudo pelo celular.</p>
     </div>
     <button class="access-card" onclick="go({v:'portaria'})">
       <div class="ico b">🎟️</div>
@@ -345,10 +392,14 @@ function renderLanding(){
     </button>
     <button class="access-card" onclick="go({v:'parceiro'})">
       <div class="ico g">🚀</div>
-      <div class="txt"><h3>Quero o Perdido no meu rolê</h3><p>Fale com a gente e comece a usar.</p></div>
+      <div class="txt"><h3>Quero a LISTA OFF no meu rolê</h3><p>Fale com a gente e comece a usar.</p></div>
       <div class="arr">→</div>
     </button>
-    <div class="admin-foot"><button onclick="go({v:'admin'})">· admin geral ·</button></div>
+    <button class="access-card" onclick="go({v:'login'})">
+      <div class="ico b">👤</div>
+      <div class="txt"><h3>Já tenho conta</h3><p>Acesse seus eventos, listas e banco de contatos.</p></div>
+      <div class="arr">→</div>
+    </button>
   </div>`;
 }
 
@@ -377,7 +428,180 @@ function renderParceiro(){
   };
 }
 
-/* =================== LOGIN =================== */
+/* =================== LOGIN / CADASTRO DO DONO (Firebase Auth) =================== */
+function renderLogin(){
+  if(!_authReady){ app.innerHTML=`<div class="loader">carregando…</div>`; return; }
+  if(CURRENT_USER){ showShell(true); return go({v:'admin'}); }
+  showShell(false);
+  let modo="login"; // ou "cadastro"
+  const draw=()=>{
+    app.innerHTML=`<div class="login-wrap">
+      <button class="fab-back" onclick="go({})">← voltar</button>
+      <div class="card">
+        <div style="font-family:'Space Grotesk';font-weight:700;font-size:26px;margin-bottom:2px">LISTA<span style="background:var(--yellow);border:2px solid var(--ink);padding:0 7px;border-radius:7px;margin-left:5px;box-shadow:2px 2px 0 var(--ink)">OFF</span></div>
+        <p class="muted" style="margin-bottom:14px">${modo==="login"?"Entre pra gerenciar seus rolês.":"Crie sua conta e comece a usar."}</p>
+        ${modo==="cadastro"?`<label>Seu nome</label><input id="auNome" placeholder="Nome completo" autocomplete="name">`:""}
+        <label>E-mail</label><input id="auEmail" type="email" placeholder="voce@email.com" autocomplete="email">
+        <label>Senha</label><input id="auPw" type="password" placeholder="${modo==="cadastro"?"crie uma senha (mín. 6)":"sua senha"}" autocomplete="${modo==="cadastro"?"new-password":"current-password"}">
+        <button class="btn btn-primary" style="width:100%;margin-top:18px" id="auBtn">${modo==="login"?"Entrar":"Criar conta →"}</button>
+        ${modo==="login"?`<button class="fab-back" style="margin:14px 0 0" id="auReset">esqueci a senha</button>`:""}
+        <div style="text-align:center;margin-top:16px;font-size:14px;color:var(--muted)">
+          ${modo==="login"?`Não tem conta? <a style="color:var(--ink);font-weight:700;cursor:pointer" id="auSwap">Criar agora</a>`:`Já tem conta? <a style="color:var(--ink);font-weight:700;cursor:pointer" id="auSwap">Entrar</a>`}
+        </div>
+      </div></div>`;
+    $("#auSwap").onclick=()=>{modo=modo==="login"?"cadastro":"login";draw();};
+    const submit=async()=>{
+      const email=($("#auEmail").value||"").trim(), pw=$("#auPw").value||"";
+      if(!email||!email.includes("@")) return toast("Digite um e-mail válido");
+      if(pw.length<6) return toast("Senha de no mínimo 6 caracteres");
+      $("#auBtn").disabled=true; $("#auBtn").textContent="…";
+      try{
+        if(modo==="cadastro"){
+          const nome=($("#auNome").value||"").trim();
+          if(nome.length<2){$("#auBtn").disabled=false;$("#auBtn").textContent="Criar conta →";return toast("Digite seu nome");}
+          const cred=await AUTH.createUserWithEmailAndPassword(AUTH.auth,email,pw);
+          try{ await AUTH.updateProfile(cred.user,{displayName:nome}); }catch(e){}
+          toast("Conta criada! 🎉");
+          // onAuthStateChanged cuida do resto (cria doc e redireciona)
+        }else{
+          await AUTH.signInWithEmailAndPassword(AUTH.auth,email,pw);
+          toast("Bem-vindo de volta 👋");
+        }
+        go({v:'admin'});
+      }catch(e){
+        $("#auBtn").disabled=false; $("#auBtn").textContent=modo==="login"?"Entrar":"Criar conta →";
+        toast(authErro(e));
+      }
+    };
+    $("#auBtn").onclick=submit;
+    $("#auPw").addEventListener("keydown",e=>{if(e.key==="Enter")submit();});
+    const r=$("#auReset"); if(r) r.onclick=async()=>{
+      const email=($("#auEmail").value||"").trim(); if(!email) return toast("Digite seu e-mail primeiro");
+      try{ await AUTH.sendPasswordResetEmail(AUTH.auth,email); toast("Enviamos um link de recuperação pro seu e-mail"); }
+      catch(e){ toast(authErro(e)); }
+    };
+  };
+  draw();
+}
+function authErro(e){
+  const c=(e&&e.code)||"";
+  if(c.includes("email-already-in-use")) return "Esse e-mail já tem conta. Faça login.";
+  if(c.includes("invalid-credential")||c.includes("wrong-password")||c.includes("user-not-found")) return "E-mail ou senha incorretos";
+  if(c.includes("weak-password")) return "Senha muito fraca (mín. 6)";
+  if(c.includes("invalid-email")) return "E-mail inválido";
+  if(c.includes("too-many-requests")) return "Muitas tentativas. Tente mais tarde.";
+  if(c.includes("network")) return "Sem conexão. Verifique a internet.";
+  return "Erro: "+(e&&e.message||"tente de novo");
+}
+
+/* =================== PAINEL DE CRÉDITOS =================== */
+async function renderPainel(){
+  renderSidebar("painel");
+  // retorno do Stripe
+  const pag=new URLSearchParams(location.search).get("pag");
+  if(pag==="ok"){ await reloadConta(); renderSidebar("painel"); toast("Pagamento recebido! Créditos liberados ✅"); }
+  else if(pag==="cancel"){ toast("Pagamento cancelado"); }
+  await reloadConta();
+  const c=CURRENT_CONTA||{};
+  // conta eventos criados por este dono
+  let nEventos=0;
+  try{
+    const evs=await FB.getDocs(FB.collection(DB,"eventos"));
+    evs.forEach(d=>{ const o=d.data().ownerUid; if(isAdminGeral()? true : o===CURRENT_USER.uid) nEventos++; });
+  }catch(e){}
+  const gratis=!!c.gratis;
+  app.innerHTML=`<h1 class="page-title">Créditos</h1>
+    <div class="stat-grid">
+      <div class="stat"><div class="n">${gratis?"∞":(c.creditos||0)}</div><div class="l">${gratis?"conta grátis":"créditos"}</div></div>
+      <div class="stat"><div class="n">${nEventos}</div><div class="l">eventos criados</div></div>
+      <div class="stat"><div class="n">${gratis?"R$ 0":fmtBRL(c.gastoTotal||0)}</div><div class="l">já investido</div></div>
+    </div>
+    ${gratis?`<div class="card" style="background:var(--yellow-tint)"><h2 style="font-size:18px">Conta grátis ✦</h2><p class="muted" style="margin-top:6px">Sua conta cria eventos ilimitados sem gastar crédito. (Liberada pelo admin geral.)</p></div>`:`
+    <div class="card">
+      <h2 style="font-size:18px;margin-bottom:4px">Comprar créditos</h2>
+      <p class="muted" style="margin-bottom:14px">1 crédito = 1 evento. Os créditos não expiram.</p>
+      <div id="pacotes" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px"></div>
+      <p class="muted" style="margin-top:12px;font-size:12px">Pagamento seguro via Stripe. Cartão de crédito.</p>
+    </div>`}
+    <div class="card">
+      <h2 style="font-size:18px;margin-bottom:8px">Como funciona</h2>
+      <p class="muted">Cada evento que você cria usa 1 crédito. Criar listas, mandar links, check-in na portaria e banco de contatos são ilimitados — você só paga por evento.</p>
+    </div>`;
+  if(!gratis){
+    const box=$("#pacotes");
+    box.innerHTML=PACOTES.map(p=>{
+      const un=p.preco/p.eventos;
+      return `<button class="stat" style="cursor:pointer;text-align:left;border-width:2px" onclick="comprarCredito('${p.id}')">
+        <div class="n" style="font-size:24px">${p.eventos} evento${p.eventos>1?'s':''}</div>
+        <div style="font-family:'Space Grotesk';font-weight:700;font-size:20px;margin-top:6px">${fmtBRL(p.preco)}</div>
+        <div class="l" style="margin-top:4px">${fmtBRL(un)} por evento</div>
+      </button>`;
+    }).join("");
+  }
+}
+window.comprarCredito=async(pacoteId)=>{
+  const p=PACOTES.find(x=>x.id===pacoteId); if(!p) return;
+  if(CHECKOUT_FN==="COLE_URL_CHECKOUT"||p.priceId.startsWith("COLE_")){
+    return openModal(`<h2>Quase lá 💳</h2><p class="muted" style="margin:8px 0">O pagamento com cartão (Stripe) ainda está sendo ligado. Assim que o Yuri configurar as chaves, esse botão abre o checkout do pacote <b>${p.eventos} evento${p.eventos>1?'s':''} · ${fmtBRL(p.preco)}</b>.</p><button class="btn btn-primary" style="width:100%;margin-top:10px" onclick="closeModal()">Ok, entendi</button>`);
+  }
+  try{
+    toast("Abrindo pagamento…");
+    const res=await fetch(CHECKOUT_FN,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({priceId:p.priceId,uid:CURRENT_USER.uid,email:CURRENT_USER.email,eventos:p.eventos,pacote:p.id})});
+    const data=await res.json();
+    if(data.url) location.href=data.url; else toast("Erro ao abrir o pagamento");
+  }catch(e){ toast("Erro ao abrir o pagamento"); }
+};
+
+/* =================== ADMIN GERAL (só Yuri) =================== */
+async function renderAdminGeral(){
+  if(!isAdminGeral()){ return go({v:'admin'}); }
+  renderSidebar("geral");
+  app.innerHTML=`<h1 class="page-title">Admin Geral 👑</h1>
+    <p class="muted" style="margin-bottom:16px">Todas as contas. Libere "grátis" pros seus próprios negócios ou dê créditos manualmente.</p>
+    <div class="search-box" style="margin-bottom:14px"><input id="agSearch" placeholder="buscar por e-mail ou nome…"></div>
+    <div id="agList"><div class="loader">carregando contas…</div></div>`;
+  const snap=await FB.getDocs(FB.collection(DB,"contas"));
+  let all=snap.docs.map(d=>({uid:d.id,...d.data()}));
+  all.sort((a,b)=>(a.email||"").localeCompare(b.email||""));
+  const draw=(f="")=>{
+    const q=f.toLowerCase();
+    const arr=all.filter(c=>(c.email||"").toLowerCase().includes(q)||(c.nome||"").toLowerCase().includes(q));
+    if(!arr.length){$("#agList").innerHTML=`<div class="empty"><div class="ic">👥</div>Nenhuma conta.</div>`;return;}
+    $("#agList").innerHTML=arr.map(c=>`<div class="card" style="margin-bottom:12px">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <div style="flex:1;min-width:160px">
+          <div style="font-weight:700">${esc(c.nome||"(sem nome)")}</div>
+          <div class="muted" style="font-size:13px">${esc(c.email||"")}</div>
+        </div>
+        ${c.gratis?`<span class="pill pill-amber">grátis ✦</span>`:`<span class="pill pill-gray">${c.creditos||0} créditos</span>`}
+      </div>
+      <div class="row" style="margin-top:12px">
+        <button class="btn btn-ghost btn-sm" onclick="toggleGratis('${c.uid}',${c.gratis?'false':'true'})">${c.gratis?'tirar grátis':'liberar grátis ✦'}</button>
+        <button class="btn btn-primary btn-sm" onclick="darCreditos('${c.uid}','${esc(c.nome||c.email)}')">+ dar créditos</button>
+      </div></div>`).join("");
+  };
+  draw(); $("#agSearch").oninput=e=>draw(e.target.value);
+}
+window.toggleGratis=async(uid,val)=>{
+  await FB.updateDoc(FB.doc(DB,"contas",uid),{gratis:val});
+  toast(val?"Conta liberada grátis ✦":"Grátis removido");
+  if(CURRENT_USER&&CURRENT_USER.uid===uid) await reloadConta();
+  renderAdminGeral();
+};
+window.darCreditos=(uid,nome)=>{
+  openModal(`<h2>Dar créditos</h2><p class="muted" style="margin:6px 0">Para <b>${nome}</b></p>
+    <label>Quantos créditos</label><input id="dcQtd" type="number" min="1" value="1">
+    <div class="row" style="margin-top:16px"><button class="btn btn-ghost" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" id="dcOk">Adicionar</button></div>`);
+  $("#dcOk").onclick=async()=>{
+    const q=parseInt($("#dcQtd").value)||0; if(q<=0) return toast("Quantidade inválida");
+    await FB.updateDoc(FB.doc(DB,"contas",uid),{creditos:FB.increment(q)});
+    closeModal(); toast(`+${q} crédito(s) adicionados`);
+    if(CURRENT_USER&&CURRENT_USER.uid===uid) await reloadConta();
+    renderAdminGeral();
+  };
+};
+
+/* =================== LOGIN (antigo, portaria) =================== */
 function loginScreen(titulo, onOk){
   showShell(false);
   app.innerHTML=`<div class="login-wrap">
@@ -392,9 +616,12 @@ function loginScreen(titulo, onOk){
   $("#logBtn").onclick=t;
   $("#pw").addEventListener("keydown",e=>{if(e.key==="Enter")t();});
 }
-function guardAdmin(){
-  if(sessionStorage.adminOk==="1"){ showShell(true); return renderAdminRoute(); }
-  loginScreen("Admin Geral 🔐",(pw)=>{if(pw===SENHA_ADMIN){sessionStorage.adminOk="1";showShell(true);renderAdminRoute();}else toast("Senha incorreta");});
+function guardAdmin(then){
+  if(!_authReady){ app.innerHTML=`<div class="loader">carregando…</div>`; return; }
+  if(!CURRENT_USER){ return renderLogin(); }
+  showShell(true);
+  if(then) return then();
+  return renderAdminRoute();
 }
 function guardPortaria(){
   if(sessionStorage.portOk==="1"){ showShell(true); return renderPortariaRoute(); }
@@ -405,11 +632,14 @@ function guardPortaria(){
 /* =================== ADMIN ROUTER =================== */
 function renderAdminRoute(){
   const p=new URLSearchParams(location.search);
+  if(p.get("v")==="painel") return renderPainel();
   if(p.get("v")==="banco") return renderBanco();
   if(p.get("v")==="relatorios") return renderRelatorios();
   if(p.get("ev")) return renderEventoDetalhe(p.get("ev"));
   return renderEventos();
 }
+// o dono pode mexer neste evento? (admin geral mexe em tudo)
+function podeEvento(evData){ return isAdminGeral() || !evData.ownerUid || evData.ownerUid===CURRENT_USER.uid; }
 
 /* =================== EVENTOS (lista estilo VIPme) =================== */
 function renderEventos(){
@@ -435,9 +665,20 @@ function renderEventos(){
   $("#evCriar").onclick=async()=>{
     const nome=$("#evNome").value.trim(),data=$("#evData").value,local=$("#evLocal").value.trim(),descricao=$("#evDesc").value.trim();
     if(!nome) return toast("Digite o nome do evento");
-    await FB.addDoc(FB.collection(DB,"eventos"),{nome,data,local,descricao,criadoEm:FB.serverTimestamp()});
-    $("#evNome").value="";$("#evData").value="";$("#evLocal").value="";$("#evDesc").value="";$("#evDesc").style.height="auto";
-    toast("Evento criado! 🎉");
+    await reloadConta();
+    const c=CURRENT_CONTA||{};
+    const precisaCredito = !isAdminGeral() && !c.gratis;
+    if(precisaCredito && (c.creditos||0)<1){
+      return openModal(`<h2>Sem créditos 💳</h2><p class="muted" style="margin:8px 0">Criar um evento usa 1 crédito e você está com <b>${c.creditos||0}</b>. Compre créditos pra continuar — a partir de ${fmtBRL(9.90)} por evento.</p><div class="row" style="margin-top:12px"><button class="btn btn-ghost" onclick="closeModal()">Agora não</button><button class="btn btn-primary" onclick="closeModal();go({v:'painel'})">Comprar créditos →</button></div>`);
+    }
+    $("#evCriar").disabled=true;
+    try{
+      await FB.addDoc(FB.collection(DB,"eventos"),{nome,data,local,descricao,ownerUid:CURRENT_USER.uid,criadoEm:FB.serverTimestamp()});
+      if(precisaCredito){ await FB.updateDoc(FB.doc(DB,"contas",CURRENT_USER.uid),{creditos:FB.increment(-1)}); await reloadConta(); renderSidebar("admin"); }
+      $("#evNome").value="";$("#evData").value="";$("#evLocal").value="";$("#evDesc").value="";$("#evDesc").style.height="auto";
+      toast(precisaCredito?"Evento criado! (-1 crédito) 🎉":"Evento criado! 🎉");
+    }catch(e){ toast("Erro ao criar evento"); }
+    $("#evCriar").disabled=false;
   };
 
   let allEv=[];
@@ -468,7 +709,8 @@ function renderEventos(){
   };
 
   watch(FB.query(FB.collection(DB,"eventos"),FB.orderBy("criadoEm","desc")),async snap=>{
-    const docs=snap.docs;
+    // só os eventos do dono logado (admin geral vê todos)
+    const docs=snap.docs.filter(d=>{const o=d.data().ownerUid; return isAdminGeral()||!o||o===CURRENT_USER.uid;});
     allEv=await Promise.all(docs.map(async d=>({id:d.id,_d:d.data(),_cont:await contarEvento(d.id)})));
     // ordena pela data do evento (mais próximo primeiro); sem data vai pro fim
     allEv.sort((a,b)=>{const da=a._d.data||"",db=b._d.data||""; if(!da&&!db)return 0; if(!da)return 1; if(!db)return -1; return da>db?-1:da<db?1:0;});
@@ -696,7 +938,8 @@ async function renderBanco(){
       <div id="bdList"><div class="loader">juntando contatos…</div></div>
     </div>`;
   const contatos=new Map();
-  const eventos=await FB.getDocs(FB.collection(DB,"eventos"));
+  const eventosAll=await FB.getDocs(FB.collection(DB,"eventos"));
+  const eventos={docs:eventosAll.docs.filter(d=>{const o=d.data().ownerUid;return isAdminGeral()||!o||o===CURRENT_USER.uid;})};
   for(const ev of ordEvDocs(eventos.docs)){
     const listas=await FB.getDocs(FB.collection(DB,"eventos",ev.id,"listas"));
     for(const l of listas.docs){
@@ -725,7 +968,9 @@ async function renderBanco(){
 async function renderRelatorios(){
   renderSidebar("relatorios");
   app.innerHTML=`<h1 class="page-title">Relatórios</h1><div id="relWrap"><div class="loader">calculando…</div></div>`;
-  const eventos=await FB.getDocs(FB.query(FB.collection(DB,"eventos"),FB.orderBy("criadoEm","desc")));
+  const eventosAll=await FB.getDocs(FB.query(FB.collection(DB,"eventos"),FB.orderBy("criadoEm","desc")));
+  const eventos={docs:eventosAll.docs.filter(d=>{const o=d.data().ownerUid;return isAdminGeral()||!o||o===CURRENT_USER.uid;})};
+  eventos.empty=eventos.docs.length===0;
   if(eventos.empty){$("#relWrap").innerHTML=`<div class="empty"><div class="ic">📊</div>Nenhum evento ainda.</div>`;return;}
   let blocos=[];
   for(const ev of ordEvDocs(eventos.docs)){
@@ -853,7 +1098,7 @@ async function renderPublic(evId,listaId){
     if(fim&&now>fim){app.innerHTML=pub(`<h1 class="pub-h1">Lista<br><span class="hl">encerrada</span></h1><p style="color:#9a9a90;margin-top:14px">Fechou em ${fmtDT(L.fim)}</p>`);return;}
     if(L.limite&&L.limite>0){const c=await FB.getDocs(FB.collection(DB,"eventos",evId,"listas",listaId,"cadastros"));if(c.size>=L.limite){app.innerHTML=pub(`<h1 class="pub-h1">Lotou!<br><span class="hl">deu ruim</span></h1><p style="color:#9a9a90;margin-top:14px">Todas as vagas foram preenchidas.</p>`);return;}}
     app.innerHTML=`<div class="pub-stage"><div class="pub-wrap">
-      <div class="pub-logo">PERDIDO</div>
+      <div class="pub-logo">LISTA OFF</div>
       <div class="pub-ev">${esc(ev.nome)}${ev.data?` · ${fmtData(ev.data)}`:''}</div>
       <h1 class="pub-h1">${esc(L.nome)}</h1>
       <div style="margin-top:14px">
@@ -885,7 +1130,7 @@ async function renderPublic(evId,listaId){
     };
   }catch(e){console.error(e);app.innerHTML=pub(`<h1 class="pub-h1">Erro ao<br>carregar</h1><p style="color:#9a9a90;margin-top:14px">${esc(e.message)}</p>`);}
 }
-function pub(html){document.body.classList.add("pub-mode");return `<div class="pub-stage"><div class="pub-wrap"><div class="pub-logo">PERDIDO</div>${html}</div></div>`;}
+function pub(html){document.body.classList.add("pub-mode");return `<div class="pub-stage"><div class="pub-wrap"><div class="pub-logo">LISTA OFF</div>${html}</div></div>`;}
 function fmtDT(d){if(!d)return"";return new Date(d).toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"});}
 
 /* =================== MODAL HELPERS =================== */
@@ -899,6 +1144,7 @@ function openConfirm(html,onYes){
 window.editarEvento=editarEvento;window.apagarEvento=apagarEvento;
 window.editarLista=editarLista;window.apagarLista=apagarLista;
 window.closeModal=closeModal;
+window.renderLogin=renderLogin;window.renderPainel=renderPainel;window.renderAdminGeral=renderAdminGeral;
 </script>
 </body>
 </html>
