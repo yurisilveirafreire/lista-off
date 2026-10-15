@@ -28,11 +28,10 @@
   const SENHA_ADMIN = "madala@417";
   // E-MAIL DO ADMIN GERAL (vê tudo e libera contas grátis)
   const ADMIN_GERAL = "yurisilveirafreire@hotmail.com";
-  // PACOTES DE CRÉDITO (1 crédito = 1 evento). priceId preenchido na etapa Stripe.
-  const PACOTES = [
-    { id:"c1",  eventos:1,  preco:9.90,  priceId:"COLE_PRICE_1" },
-    { id:"c5",  eventos:5,  preco:44.50, priceId:"COLE_PRICE_5" },
-    { id:"c10", eventos:10, preco:59.00, priceId:"COLE_PRICE_10" },
+  // PLANOS DE ASSINATURA (ilimitado enquanto ativo). priceId preenchido na etapa Stripe.
+  const PLANOS = [
+    { id:"mensal", nome:"Mensal", preco:19.90, ciclo:"mês", por:"R$ 19,90/mês",            priceId:"COLE_PRICE_MENSAL" },
+    { id:"anual",  nome:"Anual",  preco:58.80, ciclo:"ano", por:"R$ 4,90/mês · R$ 58,80/ano", priceId:"COLE_PRICE_ANUAL", destaque:true },
   ];
   // URL da Firebase Function de checkout (preenchida na etapa Stripe)
   const CHECKOUT_FN = "COLE_URL_CHECKOUT";
@@ -316,6 +315,21 @@ function clearWatchers(){ _watchers.forEach(u=>{try{u&&u()}catch(e){}}); _watche
 /* =================== FIREBASE READY =================== */
 let AUTH, CURRENT_USER=null, CURRENT_CONTA=null, _authReady=false;
 function isAdminGeral(){ return CURRENT_USER && CURRENT_USER.email && CURRENT_USER.email.toLowerCase()===ADMIN_GERAL.toLowerCase(); }
+// conta pode criar eventos? grátis, admin geral, ou assinatura ativa
+function temPlanoAtivo(){
+  const c=CURRENT_CONTA||{};
+  if(c.gratis||isAdminGeral()) return true;
+  if(!c.plano) return false;
+  if(!c.planoAte) return true; // sem data = ativo (controlado pelo Stripe)
+  const ate = c.planoAte.seconds ? c.planoAte.seconds*1000 : new Date(c.planoAte).getTime();
+  return ate>Date.now();
+}
+function planoLabel(){
+  const c=CURRENT_CONTA||{};
+  if(c.gratis) return "grátis ✦";
+  if(temPlanoAtivo()){ const p=PLANOS.find(x=>x.id===c.plano); return p?`Plano ${p.nome}`:"Ativo"; }
+  return "Sem plano";
+}
 function onFbReady(){
   FB=window._fb; DB=FB.db; AUTH=window._auth;
   if(firebaseConfig.apiKey==="COLE_AQUI"){
@@ -330,8 +344,8 @@ function onFbReady(){
       const ref=FB.doc(DB,"contas",user.uid);
       const snap=await FB.getDoc(ref);
       if(!snap.exists()){
-        await FB.setDoc(ref,{email:user.email,nome:user.displayName||"",creditos:0,gratis:false,criadoEm:FB.serverTimestamp()});
-        CURRENT_CONTA={email:user.email,nome:user.displayName||"",creditos:0,gratis:false};
+        await FB.setDoc(ref,{email:user.email,nome:user.displayName||"",plano:null,planoAte:null,gratis:false,criadoEm:FB.serverTimestamp()});
+        CURRENT_CONTA={email:user.email,nome:user.displayName||"",plano:null,planoAte:null,gratis:false};
       } else CURRENT_CONTA=snap.data();
     }
     _authReady=true;
@@ -357,7 +371,7 @@ function renderSidebar(active){
     {k:"portaria",ic:"🎟️", label:"Portaria"},
     {k:"banco",   ic:"📇", label:"Banco de Dados"},
     {k:"relatorios",ic:"📊",label:"Relatórios"},
-    {k:"painel",  ic:"💳", label:"Créditos"},
+    {k:"painel",  ic:"💳", label:"Assinatura"},
   ];
   if(isAdminGeral()) items.push({k:"geral",ic:"👑",label:"Admin Geral"});
   $("#nav").innerHTML = items.map(i=>
@@ -366,8 +380,8 @@ function renderSidebar(active){
     <a onclick="go({})"><span class="ic">↩︎</span>Tela inicial</a>
     <a onclick="sairConta()"><span class="ic">⎋</span>Sair da conta</a>`;
   const c=CURRENT_CONTA||{}; const nome=(c.nome||CURRENT_USER&&CURRENT_USER.email||"").split(" ")[0]||"Conta";
-  const cred = c.gratis ? '<span style="color:var(--yellow)">grátis ✦</span>' : `${c.creditos||0} crédito${(c.creditos||0)===1?'':'s'}`;
-  $("#sideFoot").innerHTML=`<b>${esc(nome)}</b>${cred}`;
+  const st = (c.gratis||temPlanoAtivo()) ? `<span style="color:var(--yellow)">${esc(planoLabel())}</span>` : '<span style="color:var(--muted)">sem plano</span>';
+  $("#sideFoot").innerHTML=`<b>${esc(nome)}</b>${st}`;
 }
 window.sairConta=async()=>{ try{ await AUTH.signOut(AUTH.auth); }catch(e){} sessionStorage.removeItem("adminOk"); toast("Você saiu"); go({}); };
 function showShell(show){
@@ -499,7 +513,7 @@ async function renderPainel(){
   renderSidebar("painel");
   // retorno do Stripe
   const pag=new URLSearchParams(location.search).get("pag");
-  if(pag==="ok"){ await reloadConta(); renderSidebar("painel"); toast("Pagamento recebido! Créditos liberados ✅"); }
+  if(pag==="ok"){ await reloadConta(); renderSidebar("painel"); toast("Assinatura ativa! Tudo liberado ✅"); }
   else if(pag==="cancel"){ toast("Pagamento cancelado"); }
   await reloadConta();
   const c=CURRENT_CONTA||{};
@@ -509,47 +523,58 @@ async function renderPainel(){
     const evs=await FB.getDocs(FB.collection(DB,"eventos"));
     evs.forEach(d=>{ const o=d.data().ownerUid; if(isAdminGeral()? true : o===CURRENT_USER.uid) nEventos++; });
   }catch(e){}
-  const gratis=!!c.gratis;
-  app.innerHTML=`<h1 class="page-title">Créditos</h1>
+  const gratis=!!c.gratis, ativo=temPlanoAtivo();
+  app.innerHTML=`<h1 class="page-title">Assinatura</h1>
     <div class="stat-grid">
-      <div class="stat"><div class="n">${gratis?"∞":(c.creditos||0)}</div><div class="l">${gratis?"conta grátis":"créditos"}</div></div>
+      <div class="stat"><div class="n" style="font-size:22px">${esc(planoLabel())}</div><div class="l">seu plano</div></div>
+      <div class="stat"><div class="n">${ativo?"∞":"0"}</div><div class="l">eventos liberados</div></div>
       <div class="stat"><div class="n">${nEventos}</div><div class="l">eventos criados</div></div>
-      <div class="stat"><div class="n">${gratis?"R$ 0":fmtBRL(c.gastoTotal||0)}</div><div class="l">já investido</div></div>
     </div>
-    ${gratis?`<div class="card" style="background:var(--yellow-tint)"><h2 style="font-size:18px">Conta grátis ✦</h2><p class="muted" style="margin-top:6px">Sua conta cria eventos ilimitados sem gastar crédito. (Liberada pelo admin geral.)</p></div>`:`
+    ${gratis?`<div class="card" style="background:var(--yellow-tint)"><h2 style="font-size:18px">Conta grátis ✦</h2><p class="muted" style="margin-top:6px">Sua conta cria eventos e listas ilimitados, sem pagar. (Liberada pelo admin geral.)</p></div>`:`
     <div class="card">
-      <h2 style="font-size:18px;margin-bottom:4px">Comprar créditos</h2>
-      <p class="muted" style="margin-bottom:14px">1 crédito = 1 evento. Os créditos não expiram.</p>
-      <div id="pacotes" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px"></div>
-      <p class="muted" style="margin-top:12px;font-size:12px">Pagamento seguro via Stripe. Cartão de crédito.</p>
+      <h2 style="font-size:18px;margin-bottom:4px">${ativo?"Seu plano está ativo ✓":"Escolha seu plano"}</h2>
+      <p class="muted" style="margin-bottom:14px">Com assinatura ativa, eventos e listas são ilimitados.</p>
+      <div id="planos" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px"></div>
+      ${ativo?`<button class="btn btn-ghost btn-sm" style="margin-top:14px" onclick="gerenciarAssinatura()">Gerenciar / cancelar assinatura</button>`:''}
+      <p class="muted" style="margin-top:12px;font-size:12px">Pagamento seguro via Stripe. Cartão de crédito. Cancele quando quiser.</p>
     </div>`}
     <div class="card">
-      <h2 style="font-size:18px;margin-bottom:8px">Como funciona</h2>
-      <p class="muted">Cada evento que você cria usa 1 crédito. Criar listas, mandar links, check-in na portaria e banco de contatos são ilimitados — você só paga por evento.</p>
+      <h2 style="font-size:18px;margin-bottom:8px">O que está incluso</h2>
+      <p class="muted">Eventos ilimitados, listas ilimitadas, links de cadastro, check-in na portaria, banco de contatos e relatórios. Um preço só, tudo liberado.</p>
     </div>`;
   if(!gratis){
-    const box=$("#pacotes");
-    box.innerHTML=PACOTES.map(p=>{
-      const un=p.preco/p.eventos;
-      return `<button class="stat" style="cursor:pointer;text-align:left;border-width:2px" onclick="comprarCredito('${p.id}')">
-        <div class="n" style="font-size:24px">${p.eventos} evento${p.eventos>1?'s':''}</div>
-        <div style="font-family:'Space Grotesk';font-weight:700;font-size:20px;margin-top:6px">${fmtBRL(p.preco)}</div>
-        <div class="l" style="margin-top:4px">${fmtBRL(un)} por evento</div>
+    const box=$("#planos");
+    box.innerHTML=PLANOS.map(p=>{
+      const atual = ativo && c.plano===p.id;
+      return `<button class="stat" style="cursor:pointer;text-align:left;border-width:${p.destaque?'3px':'2px'};${p.destaque?'background:var(--yellow-tint)':''};position:relative" onclick="assinarPlano('${p.id}')">
+        ${p.destaque?`<span class="pill pill-amber" style="position:absolute;top:-11px;right:12px">melhor preço</span>`:''}
+        <div style="font-family:'Space Grotesk';font-weight:700;font-size:20px">${p.nome}</div>
+        <div class="n" style="font-size:30px;margin-top:6px">${fmtBRL(p.preco)}</div>
+        <div class="l" style="margin-top:4px">${esc(p.por)}</div>
+        <div class="btn ${atual?'btn-ghost':'btn-primary'} btn-sm" style="width:100%;margin-top:12px;pointer-events:none">${atual?'plano atual ✓':'assinar →'}</div>
       </button>`;
     }).join("");
   }
 }
-window.comprarCredito=async(pacoteId)=>{
-  const p=PACOTES.find(x=>x.id===pacoteId); if(!p) return;
+window.assinarPlano=async(planoId)=>{
+  const p=PLANOS.find(x=>x.id===planoId); if(!p) return;
   if(CHECKOUT_FN==="COLE_URL_CHECKOUT"||p.priceId.startsWith("COLE_")){
-    return openModal(`<h2>Quase lá 💳</h2><p class="muted" style="margin:8px 0">O pagamento com cartão (Stripe) ainda está sendo ligado. Assim que o Yuri configurar as chaves, esse botão abre o checkout do pacote <b>${p.eventos} evento${p.eventos>1?'s':''} · ${fmtBRL(p.preco)}</b>.</p><button class="btn btn-primary" style="width:100%;margin-top:10px" onclick="closeModal()">Ok, entendi</button>`);
+    return openModal(`<h2>Quase lá 💳</h2><p class="muted" style="margin:8px 0">O pagamento (Stripe) ainda está sendo ligado. Assim que as chaves forem configuradas, esse botão abre o checkout do plano <b>${esc(p.nome)} · ${fmtBRL(p.preco)}</b>.</p><button class="btn btn-primary" style="width:100%;margin-top:10px" onclick="closeModal()">Ok, entendi</button>`);
   }
   try{
     toast("Abrindo pagamento…");
-    const res=await fetch(CHECKOUT_FN,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({priceId:p.priceId,uid:CURRENT_USER.uid,email:CURRENT_USER.email,eventos:p.eventos,pacote:p.id})});
+    const res=await fetch(CHECKOUT_FN,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({priceId:p.priceId,uid:CURRENT_USER.uid,email:CURRENT_USER.email,plano:p.id})});
     const data=await res.json();
     if(data.url) location.href=data.url; else toast("Erro ao abrir o pagamento");
   }catch(e){ toast("Erro ao abrir o pagamento"); }
+};
+window.gerenciarAssinatura=async()=>{
+  if(CHECKOUT_FN==="COLE_URL_CHECKOUT"){ return toast("Disponível assim que o Stripe for ligado"); }
+  try{
+    const res=await fetch(CHECKOUT_FN.replace("createCheckout","portal").replace("Checkout","Portal"),{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({uid:CURRENT_USER.uid})});
+    const data=await res.json();
+    if(data.url) location.href=data.url; else toast("Não consegui abrir o portal");
+  }catch(e){ toast("Não consegui abrir o portal"); }
 };
 
 /* =================== ADMIN GERAL (só Yuri) =================== */
@@ -557,7 +582,7 @@ async function renderAdminGeral(){
   if(!isAdminGeral()){ return go({v:'admin'}); }
   renderSidebar("geral");
   app.innerHTML=`<h1 class="page-title">Admin Geral 👑</h1>
-    <p class="muted" style="margin-bottom:16px">Todas as contas. Libere "grátis" pros seus próprios negócios ou dê créditos manualmente.</p>
+    <p class="muted" style="margin-bottom:16px">Todas as contas. Libere "grátis" (eventos ilimitados, sem pagar) pros seus próprios negócios.</p>
     <div class="search-box" style="margin-bottom:14px"><input id="agSearch" placeholder="buscar por e-mail ou nome…"></div>
     <div id="agList"><div class="loader">carregando contas…</div></div>`;
   const snap=await FB.getDocs(FB.collection(DB,"contas"));
@@ -573,11 +598,10 @@ async function renderAdminGeral(){
           <div style="font-weight:700">${esc(c.nome||"(sem nome)")}</div>
           <div class="muted" style="font-size:13px">${esc(c.email||"")}</div>
         </div>
-        ${c.gratis?`<span class="pill pill-amber">grátis ✦</span>`:`<span class="pill pill-gray">${c.creditos||0} créditos</span>`}
+        ${c.gratis?`<span class="pill pill-amber">grátis ✦</span>`:(c.plano?`<span class="pill pill-green">${esc(c.plano)}</span>`:`<span class="pill pill-gray">sem plano</span>`)}
       </div>
       <div class="row" style="margin-top:12px">
         <button class="btn btn-ghost btn-sm" onclick="toggleGratis('${c.uid}',${c.gratis?'false':'true'})">${c.gratis?'tirar grátis':'liberar grátis ✦'}</button>
-        <button class="btn btn-primary btn-sm" onclick="darCreditos('${c.uid}','${esc(c.nome||c.email)}')">+ dar créditos</button>
       </div></div>`).join("");
   };
   draw(); $("#agSearch").oninput=e=>draw(e.target.value);
@@ -587,18 +611,6 @@ window.toggleGratis=async(uid,val)=>{
   toast(val?"Conta liberada grátis ✦":"Grátis removido");
   if(CURRENT_USER&&CURRENT_USER.uid===uid) await reloadConta();
   renderAdminGeral();
-};
-window.darCreditos=(uid,nome)=>{
-  openModal(`<h2>Dar créditos</h2><p class="muted" style="margin:6px 0">Para <b>${nome}</b></p>
-    <label>Quantos créditos</label><input id="dcQtd" type="number" min="1" value="1">
-    <div class="row" style="margin-top:16px"><button class="btn btn-ghost" onclick="closeModal()">Cancelar</button><button class="btn btn-primary" id="dcOk">Adicionar</button></div>`);
-  $("#dcOk").onclick=async()=>{
-    const q=parseInt($("#dcQtd").value)||0; if(q<=0) return toast("Quantidade inválida");
-    await FB.updateDoc(FB.doc(DB,"contas",uid),{creditos:FB.increment(q)});
-    closeModal(); toast(`+${q} crédito(s) adicionados`);
-    if(CURRENT_USER&&CURRENT_USER.uid===uid) await reloadConta();
-    renderAdminGeral();
-  };
 };
 
 /* =================== LOGIN (antigo, portaria) =================== */
@@ -666,17 +678,14 @@ function renderEventos(){
     const nome=$("#evNome").value.trim(),data=$("#evData").value,local=$("#evLocal").value.trim(),descricao=$("#evDesc").value.trim();
     if(!nome) return toast("Digite o nome do evento");
     await reloadConta();
-    const c=CURRENT_CONTA||{};
-    const precisaCredito = !isAdminGeral() && !c.gratis;
-    if(precisaCredito && (c.creditos||0)<1){
-      return openModal(`<h2>Sem créditos 💳</h2><p class="muted" style="margin:8px 0">Criar um evento usa 1 crédito e você está com <b>${c.creditos||0}</b>. Compre créditos pra continuar — a partir de ${fmtBRL(9.90)} por evento.</p><div class="row" style="margin-top:12px"><button class="btn btn-ghost" onclick="closeModal()">Agora não</button><button class="btn btn-primary" onclick="closeModal();go({v:'painel'})">Comprar créditos →</button></div>`);
+    if(!temPlanoAtivo()){
+      return openModal(`<h2>Precisa de um plano 💳</h2><p class="muted" style="margin:8px 0">Pra criar eventos você precisa de uma assinatura ativa. Com ela os eventos e listas são <b>ilimitados</b> — a partir de ${fmtBRL(4.90)}/mês no plano anual.</p><div class="row" style="margin-top:12px"><button class="btn btn-ghost" onclick="closeModal()">Agora não</button><button class="btn btn-primary" onclick="closeModal();go({v:'painel'})">Ver planos →</button></div>`);
     }
     $("#evCriar").disabled=true;
     try{
       await FB.addDoc(FB.collection(DB,"eventos"),{nome,data,local,descricao,ownerUid:CURRENT_USER.uid,criadoEm:FB.serverTimestamp()});
-      if(precisaCredito){ await FB.updateDoc(FB.doc(DB,"contas",CURRENT_USER.uid),{creditos:FB.increment(-1)}); await reloadConta(); renderSidebar("admin"); }
       $("#evNome").value="";$("#evData").value="";$("#evLocal").value="";$("#evDesc").value="";$("#evDesc").style.height="auto";
-      toast(precisaCredito?"Evento criado! (-1 crédito) 🎉":"Evento criado! 🎉");
+      toast("Evento criado! 🎉");
     }catch(e){ toast("Erro ao criar evento"); }
     $("#evCriar").disabled=false;
   };
