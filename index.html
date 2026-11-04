@@ -28,9 +28,13 @@
   const SENHA_ADMIN = "madala@417";
   // E-MAIL DO ADMIN GERAL (vê tudo e libera contas grátis)
   const ADMIN_GERAL = "yurisilveirafreire@hotmail.com";
+  // 🔒 PAGAMENTO: deixe false enquanto o Stripe não está ligado.
+  //    false = tela "Assinatura" some e criar eventos fica liberado pra todos.
+  //    true  = cobra assinatura (precisa dos price_ e da URL do Stripe abaixo).
+  const PAGAMENTO_ATIVO = false;
   // PLANOS DE ASSINATURA (ilimitado enquanto ativo). priceId preenchido na etapa Stripe.
   const PLANOS = [
-    { id:"mensal", nome:"Mensal", preco:19.90, ciclo:"mês", por:"R$ 19,90/mês",            priceId:"COLE_PRICE_MENSAL" },
+    { id:"mensal", nome:"Mensal", preco:9.90,  ciclo:"mês", por:"R$ 9,90/mês",               priceId:"COLE_PRICE_MENSAL" },
     { id:"anual",  nome:"Anual",  preco:58.80, ciclo:"ano", por:"R$ 4,90/mês · R$ 58,80/ano", priceId:"COLE_PRICE_ANUAL", destaque:true },
   ];
   // URL da Firebase Function de checkout (preenchida na etapa Stripe)
@@ -161,6 +165,13 @@ label{font-weight:600;font-size:12px;display:block;margin:14px 0 6px;color:var(-
 .ev-card .loc{color:var(--muted);font-size:13px;margin-bottom:12px}
 .ev-card .meta{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:4px}
 .ev-card .foot{display:flex;gap:8px;flex-wrap:wrap;padding:14px 22px;border-top:1px solid var(--line);background:var(--surface-2)}
+.ev-listas{margin-top:12px;display:flex;flex-direction:column;gap:7px;cursor:default}
+.ev-lista-row{display:flex;align-items:center;gap:10px;justify-content:space-between;background:var(--surface-2);border:2px solid var(--ink);border-radius:10px;padding:8px 10px 8px 13px}
+.ev-lista-nm{font-weight:600;font-size:14px;display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.ev-lista-val{background:var(--yellow);color:var(--ink);border:1.5px solid var(--ink);border-radius:999px;font-size:11px;font-weight:700;padding:1px 8px}
+.ev-lista-qtd{color:var(--muted);font-size:12px;font-weight:600}
+.ev-lista-qtd::before{content:"· "}
+.ev-listas-vazio{margin-top:12px;font-size:13px;color:var(--muted);cursor:default}
 
 .list-row{display:flex;align-items:center;gap:12px;padding:13px 14px;border-radius:10px;border:2px solid var(--ink);margin-bottom:9px;background:var(--surface);transition:.12s;box-shadow:2px 2px 0 var(--ink)}
 .list-row.in{background:var(--yellow-tint);border-color:#f0e08a}
@@ -317,6 +328,7 @@ let AUTH, CURRENT_USER=null, CURRENT_CONTA=null, _authReady=false;
 function isAdminGeral(){ return CURRENT_USER && CURRENT_USER.email && CURRENT_USER.email.toLowerCase()===ADMIN_GERAL.toLowerCase(); }
 // conta pode criar eventos? grátis, admin geral, ou assinatura ativa
 function temPlanoAtivo(){
+  if(!PAGAMENTO_ATIVO) return true; // pagamento desligado: tudo liberado
   const c=CURRENT_CONTA||{};
   if(c.gratis||isAdminGeral()) return true;
   if(!c.plano) return false;
@@ -371,8 +383,8 @@ function renderSidebar(active){
     {k:"portaria",ic:"🎟️", label:"Portaria"},
     {k:"banco",   ic:"📇", label:"Banco de Dados"},
     {k:"relatorios",ic:"📊",label:"Relatórios"},
-    {k:"painel",  ic:"💳", label:"Assinatura"},
   ];
+  if(PAGAMENTO_ATIVO) items.push({k:"painel",ic:"💳",label:"Assinatura"});
   if(isAdminGeral()) items.push({k:"geral",ic:"👑",label:"Admin Geral"});
   $("#nav").innerHTML = items.map(i=>
     `<a class="${active===i.k?'active':''}" onclick="go({v:'${i.k}'})"><span class="ic">${i.ic}</span>${i.label}</a>`
@@ -380,7 +392,9 @@ function renderSidebar(active){
     <a onclick="go({})"><span class="ic">↩︎</span>Tela inicial</a>
     <a onclick="sairConta()"><span class="ic">⎋</span>Sair da conta</a>`;
   const c=CURRENT_CONTA||{}; const nome=(c.nome||CURRENT_USER&&CURRENT_USER.email||"").split(" ")[0]||"Conta";
-  const st = (c.gratis||temPlanoAtivo()) ? `<span style="color:var(--yellow)">${esc(planoLabel())}</span>` : '<span style="color:var(--muted)">sem plano</span>';
+  let st;
+  if(!PAGAMENTO_ATIVO) st = `<span style="color:#7a6a58">${isAdminGeral()?'admin geral':'logado'}</span>`;
+  else st = (c.gratis||temPlanoAtivo()) ? `<span style="color:var(--yellow)">${esc(planoLabel())}</span>` : '<span style="color:var(--muted)">sem plano</span>';
   $("#sideFoot").innerHTML=`<b>${esc(nome)}</b>${st}`;
 }
 window.sairConta=async()=>{ try{ await AUTH.signOut(AUTH.auth); }catch(e){} sessionStorage.removeItem("adminOk"); toast("Você saiu"); go({}); };
@@ -644,7 +658,7 @@ function guardPortaria(){
 /* =================== ADMIN ROUTER =================== */
 function renderAdminRoute(){
   const p=new URLSearchParams(location.search);
-  if(p.get("v")==="painel") return renderPainel();
+  if(p.get("v")==="painel") return PAGAMENTO_ATIVO ? renderPainel() : renderEventos();
   if(p.get("v")==="banco") return renderBanco();
   if(p.get("v")==="relatorios") return renderRelatorios();
   if(p.get("ev")) return renderEventoDetalhe(p.get("ev"));
@@ -698,6 +712,16 @@ function renderEventos(){
     $("#evLista").innerHTML=arr.map(o=>{
       const e=o._d,c=o._cont;
       const pres=`${c.checkin}/${c.total}`;
+      const atalho = (c.listas&&c.listas.length) ? `
+          <div class="ev-listas" onclick="event.stopPropagation()">
+            ${c.listas.map(l=>{
+              const link=`${baseUrl()}?ev=${o.id}&lista=${l.id}`;
+              return `<div class="ev-lista-row">
+                <span class="ev-lista-nm">${esc(l.nome)}${l.valor>0?` <span class="ev-lista-val">${fmtBRL(l.valor)}</span>`:''} <span class="ev-lista-qtd">${l.qtd}</span></span>
+                <button class="btn btn-ghost btn-sm" onclick="copyLinkVal('${link.replace(/'/g,"\\'")}')">🔗 copiar link</button>
+              </div>`;
+            }).join("")}
+          </div>` : `<div class="ev-listas-vazio" onclick="event.stopPropagation()">Nenhuma lista criada ainda · <b>Gerenciar listas</b> pra criar</div>`;
       return `<div class="ev-card">
         <div class="body" onclick="go({ev:'${o.id}'})" style="cursor:pointer">
           <div class="date">${fmtData(e.data)}</div>
@@ -707,6 +731,7 @@ function renderEventos(){
             <span class="pill pill-green">Presentes: ${pres}</span>
             <span class="pill pill-gray">${c.f}♀ / ${c.m}♂${c.o?` / ${c.o}⚧`:''}</span>
           </div>
+          ${atalho}
         </div>
         <div class="foot">
           <button class="btn btn-primary btn-sm" onclick="go({ev:'${o.id}'})">Gerenciar listas</button>
@@ -730,13 +755,16 @@ function renderEventos(){
 }
 
 async function contarEvento(evId){
-  let total=0,f=0,m=0,o=0,checkin=0;
-  const listas=await FB.getDocs(FB.collection(DB,"eventos",evId,"listas"));
-  for(const l of listas.docs){
+  let total=0,f=0,m=0,o=0,checkin=0; const listas=[];
+  const snap=await FB.getDocs(FB.collection(DB,"eventos",evId,"listas"));
+  for(const l of snap.docs){
+    let lt=0;
     const cads=await FB.getDocs(FB.collection(DB,"eventos",evId,"listas",l.id,"cadastros"));
-    cads.forEach(c=>{const x=c.data();total++;if(x.sex==="F")f++;else if(x.sex==="M")m++;else o++;if(x.checkin)checkin++;});
+    cads.forEach(c=>{const x=c.data();total++;lt++;if(x.sex==="F")f++;else if(x.sex==="M")m++;else o++;if(x.checkin)checkin++;});
+    listas.push({id:l.id, nome:l.data().nome||"Lista", valor:l.data().valor||0, qtd:lt});
   }
-  return {total,f,m,o,checkin};
+  listas.sort((a,b)=>(a.nome||"").localeCompare(b.nome||""));
+  return {total,f,m,o,checkin,listas};
 }
 
 /* ====== editar/apagar EVENTO ====== */
@@ -858,6 +886,7 @@ async function renderEventoDetalhe(evId){
   });
 }
 window.copyLink=(id)=>{const i=document.getElementById(id);i.select();navigator.clipboard.writeText(i.value);toast("Link copiado! 📋");};
+window.copyLinkVal=(url)=>{navigator.clipboard.writeText(url).then(()=>toast("Link copiado! 📋")).catch(()=>{const t=document.createElement("textarea");t.value=url;document.body.appendChild(t);t.select();try{document.execCommand("copy");toast("Link copiado! 📋");}catch(e){toast("Não consegui copiar");}document.body.removeChild(t);});};
 
 /* ====== editar/apagar LISTA ====== */
 async function editarLista(evId,listaId){
