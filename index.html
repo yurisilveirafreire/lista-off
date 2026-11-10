@@ -1151,21 +1151,37 @@ async function renderPublic(evId,listaId){
         <label>Sexo</label><select id="pSex"><option value="">Selecione…</option><option value="F">Feminino</option><option value="M">Masculino</option><option value="O">Outro</option></select>
         <button class="btn btn-green" style="width:100%;margin-top:20px" id="pSend">Bora, tô dentro →</button>
       </div></div></div>`;
-    $("#pSend").onclick=async()=>{
+    // HTML do formulário (reutilizado no "adicionar mais uma pessoa")
+    const formHTML=()=>`
+        <h2 style="font-family:'Space Grotesk';font-size:18px;color:#fff;margin-bottom:10px">Bota teu nome na lista</h2>
+        <label>Nome completo</label><input id="pNome" placeholder="Seu nome completo" autocomplete="name">
+        <label>WhatsApp (com DDD)</label><input id="pWpp" placeholder="(38) 9 9999-9999" inputmode="tel">
+        <label>Sexo</label><select id="pSex"><option value="">Selecione…</option><option value="F">Feminino</option><option value="M">Masculino</option><option value="O">Outro</option></select>
+        <button class="btn btn-green" style="width:100%;margin-top:20px" id="pSend">Bora, tô dentro →</button>`;
+
+    function ligarForm(){
+      $("#pSend").onclick=enviar;
+      $("#pWpp").addEventListener("keydown",e=>{if(e.key==="Enter")enviar();});
+    }
+    async function enviar(){
       const nome=$("#pNome").value.trim(),wpp=$("#pWpp").value.trim(),sex=$("#pSex").value;
-      if(nome.length<3) return toast("Digite seu nome completo");
+      if(nome.length<3) return toast("Digite o nome completo");
       if(wpp.replace(/\D/g,"").length<10) return toast("WhatsApp inválido");
       if(!sex) return toast("Selecione o sexo");
       $("#pSend").disabled=true;$("#pSend").textContent="enviando…";
       try{
         await FB.addDoc(FB.collection(DB,"eventos",evId,"listas",listaId,"cadastros"),{nome,nomeLower:nome.toLowerCase(),wpp,sex,checkin:false,criadoEm:FB.serverTimestamp()});
         const primeiro=esc(nome.split(" ")[0]);
-        $("#formCard").outerHTML=`<div class="pub-done">
+        $("#formCard").innerHTML=`<div class="pub-done">
           <h2>CÊ TÁ NA LISTA ✅</h2>
           ${L.valor>0?`<p style="font-family:'Space Grotesk';font-weight:700;font-size:18px;margin-top:8px">Paga ${fmtBRL(L.valor)} na portaria</p><p style="margin-top:6px;font-size:14px">${primeiro}, é só chegar, falar seu nome e pagar na entrada.</p>`:`<p style="margin-top:8px;font-size:14px">${primeiro}, é só chegar e falar seu nome na portaria.</p>`}
-          <div style="margin-top:16px;font-size:13px;font-weight:600;opacity:.7">${esc(ev.nome)} · ${esc(L.nome)}</div></div>`;
+          <div style="margin-top:16px;font-size:13px;font-weight:600;opacity:.7">${esc(ev.nome)} · ${esc(L.nome)}</div>
+          <button class="btn btn-green" style="width:100%;margin-top:20px" id="pMais">+ Adicionar mais uma pessoa</button>
+          <p style="margin-top:12px;font-size:12px;opacity:.55">Tá vindo com os amigos? Bota todo mundo na lista 😎</p></div>`;
+        $("#pMais").onclick=()=>{ $("#formCard").innerHTML=formHTML(); ligarForm(); $("#pNome").focus(); $("#formCard").scrollIntoView({behavior:"smooth",block:"center"}); };
       }catch(e){console.error(e);toast("Erro ao enviar, tente de novo");$("#pSend").disabled=false;$("#pSend").textContent="Bora, tô dentro →";}
-    };
+    }
+    ligarForm();
   }catch(e){console.error(e);app.innerHTML=pub(`<h1 class="pub-h1">Erro ao<br>carregar</h1><p style="color:#9a9a90;margin-top:14px">${esc(e.message)}</p>`);}
 }
 function pub(html){document.body.classList.add("pub-mode");return `<div class="pub-stage"><div class="pub-wrap"><div class="pub-logo">LISTA OFF</div>${html}</div></div>`;}
