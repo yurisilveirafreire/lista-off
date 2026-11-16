@@ -30,13 +30,15 @@
   const ADMIN_GERAL = "yurisilveirafreire@hotmail.com";
   // 🔒 PAGAMENTO: deixe false enquanto o Stripe não está ligado.
   //    false = tela "Assinatura" some e criar eventos fica liberado pra todos.
-  //    true  = cobra assinatura (precisa dos price_ e da URL do Stripe abaixo).
+  //    true  = cobra assinatura (precisa do price_ e da URL do Stripe abaixo).
   const PAGAMENTO_ATIVO = false;
-  // PLANOS DE ASSINATURA (ilimitado enquanto ativo). priceId preenchido na etapa Stripe.
+  // DIAS DE TESTE GRÁTIS (trial) antes de começar a cobrar
+  const TRIAL_DIAS = 7;
+  // PLANO ÚNICO — R$ 99/mês, tudo ilimitado. priceId preenchido na etapa Stripe.
   const PLANOS = [
-    { id:"mensal", nome:"Mensal", preco:9.90,  ciclo:"mês", por:"R$ 9,90/mês",               priceId:"COLE_PRICE_MENSAL" },
-    { id:"anual",  nome:"Anual",  preco:58.80, ciclo:"ano", por:"R$ 4,90/mês · R$ 58,80/ano", priceId:"COLE_PRICE_ANUAL", destaque:true },
+    { id:"mensal", nome:"LISTA OFF Pro", preco:99.00, ciclo:"mês", por:"R$ 99/mês", priceId:"COLE_PRICE_MENSAL", destaque:true },
   ];
+  const PLANO = PLANOS[0];
   // URL da Firebase Function de checkout (preenchida na etapa Stripe)
   const CHECKOUT_FN = "COLE_URL_CHECKOUT";
 </script>
@@ -307,6 +309,7 @@ function route(){
   if(v==="portaria") return guardPortaria();
   if(v==="parceiro") return renderParceiro();
   if(v==="login") return renderLogin();
+  if(v==="escolher") return guardAdmin(()=>renderEscolher());
   if(v==="geral") return guardAdmin(()=>renderAdminGeral());
   if(v==="painel"||v==="admin"||v==="banco"||v==="relatorios" || (p.get("ev")&&!p.get("lista"))) return guardAdmin();
   return renderLanding();
@@ -326,20 +329,24 @@ function clearWatchers(){ _watchers.forEach(u=>{try{u&&u()}catch(e){}}); _watche
 /* =================== FIREBASE READY =================== */
 let AUTH, CURRENT_USER=null, CURRENT_CONTA=null, _authReady=false;
 function isAdminGeral(){ return CURRENT_USER && CURRENT_USER.email && CURRENT_USER.email.toLowerCase()===ADMIN_GERAL.toLowerCase(); }
-// conta pode criar eventos? grátis, admin geral, ou assinatura ativa
+function _ms(t){ if(!t) return 0; return t.seconds ? t.seconds*1000 : new Date(t).getTime(); }
+function emTrial(){ const c=CURRENT_CONTA||{}; const t=_ms(c.trialAte); return t && t>Date.now(); }
+// conta pode criar eventos? grátis, admin geral, assinatura ativa, ou em trial
 function temPlanoAtivo(){
   if(!PAGAMENTO_ATIVO) return true; // pagamento desligado: tudo liberado
   const c=CURRENT_CONTA||{};
   if(c.gratis||isAdminGeral()) return true;
+  if(emTrial()) return true;                         // em período de teste grátis
   if(!c.plano) return false;
-  if(!c.planoAte) return true; // sem data = ativo (controlado pelo Stripe)
-  const ate = c.planoAte.seconds ? c.planoAte.seconds*1000 : new Date(c.planoAte).getTime();
-  return ate>Date.now();
+  if(!c.planoAte) return true;                        // sem data = ativo (controlado pelo Stripe)
+  return _ms(c.planoAte)>Date.now();
 }
+function diasRestantes(t){ const ms=_ms(t)-Date.now(); return ms>0?Math.ceil(ms/86400000):0; }
 function planoLabel(){
   const c=CURRENT_CONTA||{};
-  if(c.gratis) return "grátis ✦";
-  if(temPlanoAtivo()){ const p=PLANOS.find(x=>x.id===c.plano); return p?`Plano ${p.nome}`:"Ativo"; }
+  if(c.gratis) return "Cortesia ✦";
+  if(emTrial()) return `Teste · faltam ${diasRestantes(c.trialAte)}d`;
+  if(temPlanoAtivo()) return "LISTA OFF Pro";
   return "Sem plano";
 }
 function onFbReady(){
@@ -404,31 +411,303 @@ function showShell(show){
   document.querySelector(".main").style.marginLeft = show?"":"0";
 }
 
-/* =================== LANDING =================== */
+/* =================== LANDING DE VENDA (home) =================== */
 function renderLanding(){
   showShell(false);
-  app.closest(".main").style.marginLeft="0";
-  app.innerHTML=`<div class="landing-wrap">
-    <div class="hero">
-      <div class="mark">LISTA<span class="off">OFF</span></div>
-      <p>A lista do seu rolê, sem papel. Gerencie tudo pelo celular.</p>
+  document.body.classList.add("pub-mode"); // full-bleed: zera max-width/padding do container
+  const m=app.closest(".main"); if(m) m.style.marginLeft="0";
+  const precoMes=fmtBRL(PLANO.preco);
+  app.innerHTML=`<div class="lp">
+  <style>
+  .lp{--o:#FF5C00;--o2:#E64E00;--osoft:#FFE7D6;--otint:#FFF1E6;--ink:#120D08;--ink2:#4A423A;--bg:#FFF8F2;--surf:#fff;
+    font-family:'Inter',sans-serif;color:var(--ink);line-height:1.55;background:var(--bg);min-height:100vh}
+  .lp *{box-sizing:border-box}
+  .lp h1,.lp h2,.lp h3,.lp .disp{font-family:'Space Grotesk',sans-serif;font-weight:700;letter-spacing:-.02em;line-height:1.02}
+  .lp .wrap{max-width:1080px;margin:0 auto;padding:0 20px}
+  /* nav */
+  .lp .nav{position:sticky;top:0;z-index:40;background:var(--bg);border-bottom:2px solid var(--ink)}
+  .lp .nav .wrap{display:flex;align-items:center;justify-content:space-between;height:62px}
+  .lp .logo{font-family:'Space Grotesk';font-weight:700;font-size:20px;letter-spacing:-.02em}
+  .lp .logo .b{background:var(--o);color:var(--ink);border:2px solid var(--ink);padding:0 7px;margin-left:6px;border-radius:7px;box-shadow:2px 2px 0 var(--ink)}
+  .lp .nav-links{display:flex;align-items:center;gap:22px}
+  .lp .nav-links a{font-weight:600;font-size:14px;text-decoration:none;color:var(--ink2);cursor:pointer}
+  .lp .nav-links a:hover{color:var(--ink)}
+  /* botoes */
+  .lp .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:2.5px solid var(--ink);border-radius:12px;
+    padding:13px 20px;font-family:'Space Grotesk';font-weight:700;font-size:15px;cursor:pointer;text-decoration:none;
+    background:var(--surf);color:var(--ink);box-shadow:4px 4px 0 var(--ink);transition:transform .1s,box-shadow .1s;min-height:46px}
+  .lp .btn:hover{transform:translate(2px,2px);box-shadow:2px 2px 0 var(--ink)}
+  .lp .btn:active{transform:translate(4px,4px);box-shadow:0 0 0 var(--ink)}
+  .lp .btn-o{background:var(--o);color:var(--ink)}
+  .lp .btn-dark{background:var(--ink);color:#fff}
+  .lp .btn-sm{padding:9px 14px;font-size:13px;box-shadow:3px 3px 0 var(--ink);min-height:0}
+  .lp .btn-lg{padding:16px 26px;font-size:17px}
+  /* hero */
+  .lp .hero{padding:56px 0 30px}
+  .lp .hgrid{display:grid;grid-template-columns:1.05fr .95fr;gap:48px;align-items:center}
+  .lp .hero h1{font-size:clamp(40px,6.4vw,70px)}
+  .lp .hero h1 em{font-style:normal;background:var(--o);padding:0 10px;border:3px solid var(--ink);border-radius:12px;box-shadow:5px 5px 0 var(--ink);display:inline-block;transform:rotate(-1.5deg)}
+  .lp .hero .sub{font-size:clamp(16px,2vw,20px);color:var(--ink2);margin-top:22px;max-width:32ch;font-weight:500}
+  .lp .hero .acts{display:flex;gap:12px;margin-top:28px;flex-wrap:wrap}
+  .lp .hero .note{margin-top:16px;font-size:13.5px;color:var(--ink2);font-weight:500}
+  /* live card */
+  .lp .live{background:var(--ink);border-radius:16px;border:3px solid var(--ink);box-shadow:8px 8px 0 var(--o);overflow:hidden}
+  .lp .live .top{padding:15px 17px;display:flex;align-items:center;justify-content:space-between;border-bottom:2px solid #2a241d}
+  .lp .live .tag{font-family:'Space Grotesk';font-weight:600;font-size:12px;color:#c9a582}
+  .lp .live .tag b{color:#fff}
+  .lp .chips{display:flex;gap:6px}
+  .lp .chip{font-family:'Space Grotesk';font-weight:700;font-size:12px;padding:4px 9px;border-radius:999px;border:2px solid #000}
+  .lp .chip.t{background:var(--o);color:var(--ink)}.lp .chip.f{background:#E9499A;color:#fff}.lp .chip.m{background:#2563EB;color:#fff}
+  .lp .live .body{background:#19130d;padding:13px}
+  .lp .live .inp{display:flex;gap:8px;margin-bottom:11px;flex-wrap:wrap}
+  .lp .live input{flex:1 1 100%;min-width:0;padding:11px 13px;border:2px solid #000;border-radius:9px;font-family:'Inter';font-size:14px;background:#fff;color:var(--ink)}
+  @media(min-width:420px){.lp .live input{flex:1 1 auto}}
+  .lp .live .sx{display:flex;border:2px solid #000;border-radius:9px;overflow:hidden;background:#fff;flex:1 1 auto}
+  .lp .live .sx button{border:0;background:#fff;font-family:'Space Grotesk';font-weight:700;font-size:14px;padding:0 15px;cursor:pointer;color:var(--ink2);flex:1}
+  .lp .live .sx button.on.f{background:#E9499A;color:#fff}.lp .live .sx button.on.m{background:#2563EB;color:#fff}
+  .lp .live .add{border:2px solid #000;background:var(--o);color:var(--ink);font-family:'Space Grotesk';font-weight:700;border-radius:9px;padding:0 15px;cursor:pointer;font-size:17px;flex:0 0 auto}
+  .lp .live ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;max-height:210px;overflow:auto}
+  .lp .live li{display:flex;align-items:center;gap:10px;background:#fff;border:2px solid #000;border-radius:9px;padding:9px 12px;font-weight:600;font-size:14px;animation:lpop .25s}
+  .lp .live li .dot{width:8px;height:8px;border-radius:999px;flex:none}
+  .lp .live li .dot.f{background:#E9499A}.lp .live li .dot.m{background:#2563EB}
+  .lp .live li .nm{flex:1;color:var(--ink)}
+  .lp .live li .ck{width:24px;height:24px;border-radius:7px;border:2px solid #000;background:var(--bg);display:grid;place-items:center;font-size:13px;cursor:pointer;color:transparent}
+  .lp .live li.done .ck{background:#1F7A3D;color:#fff}
+  .lp .live li.done .nm{color:var(--ink2);text-decoration:line-through}
+  .lp .live .empty{color:#7a6a58;text-align:center;padding:18px 0;font-size:13px}
+  @keyframes lpop{from{opacity:0;transform:translateY(-6px)}to{opacity:1}}
+  /* strip */
+  .lp .strip{background:var(--ink);color:#fff;border-top:3px solid var(--ink);border-bottom:3px solid var(--ink);overflow:hidden;white-space:nowrap}
+  .lp .strip .trk{display:inline-flex;animation:lmarq 20s linear infinite}
+  .lp .strip span{font-family:'Space Grotesk';font-weight:700;font-size:18px;padding:13px 24px;display:inline-flex;align-items:center;gap:24px}
+  .lp .strip span::after{content:"◆";color:var(--o);font-size:11px}
+  @keyframes lmarq{to{transform:translateX(-50%)}}
+  /* sections */
+  .lp section{position:relative}
+  .lp .sec{padding:80px 0}
+  .lp .shead{max-width:40ch}
+  .lp .shead h2{font-size:clamp(30px,4.2vw,46px)}
+  .lp .shead p{font-size:17px;color:var(--ink2);margin-top:14px;font-weight:500}
+  /* passos */
+  .lp .steps{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;margin-top:44px}
+  .lp .step{background:var(--surf);border:3px solid var(--ink);border-radius:16px;padding:22px;box-shadow:6px 6px 0 var(--ink)}
+  .lp .step .big{font-family:'Space Grotesk';font-weight:700;font-size:48px;color:var(--o);line-height:.9;-webkit-text-stroke:2px var(--ink)}
+  .lp .step h3{font-size:19px;margin:12px 0 7px}
+  .lp .step p{color:var(--ink2);font-size:14.5px;font-weight:500}
+  .lp .step.o{background:var(--o)}
+  /* features */
+  .lp .feats{display:grid;grid-template-columns:1.3fr 1fr;gap:18px;margin-top:44px}
+  .lp .ft{border:3px solid var(--ink);border-radius:16px;padding:26px;box-shadow:6px 6px 0 var(--ink)}
+  .lp .ft.wide{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;gap:26px;align-items:center}
+  .lp .ft h3{font-size:22px;margin-bottom:9px}
+  .lp .ft p{color:var(--ink2);font-weight:500;font-size:15.5px}
+  .lp .ft.a{background:var(--otint)}.lp .ft.b{background:var(--ink);color:#fff}.lp .ft.b p{color:#cbbcae}.lp .ft.c{background:var(--surf)}.lp .ft.d{background:var(--osoft)}
+  /* numeros */
+  .lp .nums{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:40px}
+  .lp .num{border:3px solid var(--ink);border-radius:16px;padding:26px;box-shadow:6px 6px 0 var(--ink);background:var(--surf)}
+  .lp .num .v{font-family:'Space Grotesk';font-weight:700;font-size:clamp(34px,5vw,52px);line-height:1}
+  .lp .num .l{font-weight:600;color:var(--ink2);margin-top:8px;font-size:15px}
+  .lp .num.o{background:var(--o)}
+  /* preço */
+  .lp .price{background:var(--ink);border-top:3px solid var(--ink);border-bottom:3px solid var(--ink);padding:76px 0;color:#fff}
+  .lp .pcard{max-width:440px;margin:0 auto;background:var(--surf);color:var(--ink);border:3px solid var(--o);border-radius:20px;box-shadow:10px 10px 0 var(--o);padding:34px;text-align:center}
+  .lp .pcard .tag{display:inline-block;background:var(--o);color:var(--ink);border:2px solid var(--ink);border-radius:999px;font-family:'Space Grotesk';font-weight:700;font-size:13px;padding:4px 14px;box-shadow:2px 2px 0 var(--ink)}
+  .lp .pcard .big{font-family:'Space Grotesk';font-weight:700;font-size:64px;line-height:1;margin-top:16px}
+  .lp .pcard .big small{font-size:20px;font-weight:600}
+  .lp .pcard ul{list-style:none;padding:0;margin:20px 0;text-align:left;display:flex;flex-direction:column;gap:9px}
+  .lp .pcard li{font-weight:500;font-size:15.5px;display:flex;gap:9px}
+  .lp .pcard li::before{content:"✓";color:#1F7A3D;font-weight:900}
+  /* acessos */
+  .lp .acc{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:44px}
+  .lp .ac{display:flex;flex-direction:column;border:3px solid var(--ink);border-radius:16px;padding:26px;box-shadow:7px 7px 0 var(--ink);background:var(--surf);text-decoration:none;color:var(--ink);cursor:pointer;transition:transform .12s,box-shadow .12s;text-align:left;min-height:220px}
+  .lp .ac:hover{transform:translate(3px,3px);box-shadow:3px 3px 0 var(--ink)}
+  .lp .ac .ic{width:50px;height:50px;border:2.5px solid var(--ink);border-radius:12px;display:grid;place-items:center;font-size:24px;margin-bottom:16px;box-shadow:3px 3px 0 var(--ink)}
+  .lp .ac.port .ic{background:var(--o)}.lp .ac.ass .ic{background:var(--ink);color:#fff}.lp .ac.log .ic{background:var(--osoft)}
+  .lp .ac h3{font-size:21px;margin-bottom:8px}.lp .ac p{color:var(--ink2);font-weight:500;font-size:15px;flex:1}
+  .lp .ac .go{margin-top:16px;font-family:'Space Grotesk';font-weight:700}
+  .lp .ac.ass{background:var(--otint)}
+  /* faq */
+  .lp .faq{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:40px}
+  .lp .q{border:3px solid var(--ink);border-radius:14px;background:var(--surf);overflow:hidden}
+  .lp .q summary{list-style:none;cursor:pointer;padding:18px 20px;font-family:'Space Grotesk';font-weight:700;font-size:16.5px;display:flex;justify-content:space-between;gap:12px}
+  .lp .q summary::-webkit-details-marker{display:none}
+  .lp .q .pm{font-size:22px;transition:transform .2s}.lp .q[open] .pm{transform:rotate(45deg)}
+  .lp .q .ans{padding:0 20px 18px;color:var(--ink2);font-weight:500;font-size:15px}
+  /* cta + footer */
+  .lp .final{background:var(--o);border-top:3px solid var(--ink);border-bottom:3px solid var(--ink);padding:76px 0;text-align:center}
+  .lp .final h2{font-size:clamp(32px,5.5vw,56px)}
+  .lp .final p{font-size:18px;font-weight:500;margin-top:16px;max-width:34ch;margin-inline:auto}
+  .lp .final .fa{display:flex;gap:12px;justify-content:center;margin-top:30px;flex-wrap:wrap}
+  .lp .foot{background:var(--ink);color:#fff;padding:48px 0 36px}
+  .lp .foot .big{font-family:'Space Grotesk';font-weight:700;font-size:clamp(40px,8vw,80px);line-height:.9}
+  .lp .foot .big .b{background:var(--o);color:var(--ink);padding:0 11px;border-radius:12px;margin-left:7px}
+  .lp .foot .fl{display:flex;flex-direction:column;gap:8px;text-align:right}
+  .lp .foot .fl a{color:#cbbcae;text-decoration:none;font-weight:500;font-size:14px;cursor:pointer}
+  .lp .foot .fl a:hover{color:#fff}
+  .lp .foot .cc{margin-top:36px;color:#7a6a58;font-size:12px;border-top:2px solid #2a241d;padding-top:18px}
+  @media(max-width:860px){
+    .lp .hgrid{grid-template-columns:1fr;gap:32px}.lp .hero{padding:36px 0 16px}
+    .lp .steps,.lp .acc,.lp .nums{grid-template-columns:1fr}.lp .feats,.lp .ft.wide{grid-template-columns:1fr}
+    .lp .faq{grid-template-columns:1fr}.lp .nav-links a:not(.btn){display:none}.lp .sec{padding:60px 0}
+  }
+  </style>
+
+  <header class="nav"><div class="wrap">
+    <div class="logo">LISTA<span class="b">OFF</span></div>
+    <nav class="nav-links">
+      <a onclick="document.getElementById('como').scrollIntoView({behavior:'smooth'})">Como funciona</a>
+      <a onclick="document.getElementById('preco').scrollIntoView({behavior:'smooth'})">Preço</a>
+      <a class="btn btn-sm btn-o" onclick="go({v:'login'})">Entrar</a>
+    </nav>
+  </div></header>
+
+  <section class="hero"><div class="wrap hgrid">
+    <div>
+      <h1>A lista do seu<br>rolê, <em>sem papel</em></h1>
+      <p class="sub">Manda o link, o cliente se cadastra sozinho e a portaria faz o check-in num toque. Tudo no celular.</p>
+      <div class="acts">
+        <a class="btn btn-o btn-lg" onclick="go({v:'login'})">Testar ${TRIAL_DIAS} dias grátis →</a>
+        <a class="btn btn-lg" onclick="document.getElementById('como').scrollIntoView({behavior:'smooth'})">Ver como funciona</a>
+      </div>
+      <p class="note">${TRIAL_DIAS} dias grátis · depois ${precoMes}/mês · cancele quando quiser</p>
     </div>
-    <button class="access-card" onclick="go({v:'portaria'})">
-      <div class="ico b">🎟️</div>
-      <div class="txt"><h3>Acesso à Portaria</h3><p>Login da equipe que faz o check-in na entrada.</p></div>
-      <div class="arr">→</div>
-    </button>
-    <button class="access-card" onclick="go({v:'parceiro'})">
-      <div class="ico g">🚀</div>
-      <div class="txt"><h3>Quero a LISTA OFF no meu rolê</h3><p>Fale com a gente e comece a usar.</p></div>
-      <div class="arr">→</div>
-    </button>
-    <button class="access-card" onclick="go({v:'login'})">
-      <div class="ico b">👤</div>
-      <div class="txt"><h3>Já tenho conta</h3><p>Acesse seus eventos, listas e banco de contatos.</p></div>
-      <div class="arr">→</div>
-    </button>
+    <div class="live" id="lpLive">
+      <div class="top">
+        <div class="tag">LISTA · <b>Sextou na Madá</b></div>
+        <div class="chips"><span class="chip t" id="lcT">0</span><span class="chip f" id="lcF">0♀</span><span class="chip m" id="lcM">0♂</span></div>
+      </div>
+      <div class="body">
+        <div class="inp">
+          <input id="lcIn" placeholder="Nome na lista…" maxlength="22" aria-label="Nome">
+          <div class="sx"><button type="button" class="on f" id="lcBF">F</button><button type="button" class="m" id="lcBM">M</button></div>
+          <button class="add" id="lcAdd" aria-label="Adicionar">+</button>
+        </div>
+        <ul id="lcUl"></ul>
+        <div class="empty" id="lcEmpty">Digita um nome 👆 e vê entrar em ordem</div>
+      </div>
+    </div>
+  </div></section>
+
+  <div class="strip"><div class="trk">
+    <span>SEM PAPEL</span><span>SEM FILA</span><span>CADASTRO PELO LINK</span><span>CHECK-IN NUM TOQUE</span><span>BANCO DE CONTATOS</span>
+    <span>SEM PAPEL</span><span>SEM FILA</span><span>CADASTRO PELO LINK</span><span>CHECK-IN NUM TOQUE</span><span>BANCO DE CONTATOS</span>
+  </div></div>
+
+  <section class="sec" id="como"><div class="wrap">
+    <div class="shead"><h2>Do convite à portaria em 4 passos.</h2><p>Monta o evento uma vez. O resto roda sozinho.</p></div>
+    <div class="steps">
+      <div class="step"><div class="big">1</div><h3>Cria o evento e as listas</h3><p>Abre quantas listas quiser (DJ, aniversário, promoter) e define grátis ou valor na porta.</p></div>
+      <div class="step o"><div class="big">2</div><h3>Manda o link</h3><p>Cada lista vira um link. Joga no story, no grupo, no direct. O cliente se cadastra sozinho.</p></div>
+      <div class="step"><div class="big">3</div><h3>Portaria confere</h3><p>Na entrada, busca o nome, dá o toque e tá dentro. Em ordem alfabética, sem papel.</p></div>
+      <div class="step"><div class="big">4</div><h3>Chama de novo</h3><p>Todo mundo que passou vira contato salvo. No próximo rolê, é só chamar quem já foi.</p></div>
+    </div>
+  </div></section>
+
+  <section class="sec" style="background:var(--otint);border-top:3px solid var(--ink);border-bottom:3px solid var(--ink)"><div class="wrap">
+    <div class="shead"><h2>Feito pra quem produz a noite.</h2><p>O que você já faz no papel, só que rápido e sem erro.</p></div>
+    <div class="feats">
+      <div class="ft b"><h3>Check-in que acompanha o movimento</h3><p>O nome entra na busca e some da fila. Você vê quantos já entraram em tempo real — e quantos faltam.</p></div>
+      <div class="ft a"><h3>Quanto vai de mulher e de homem</h3><p>A lista conta sozinha o total e separa por sexo. Dá pra dimensionar equipe, bar e segurança antes de abrir.</p></div>
+      <div class="ft wide c">
+        <div><h3>Banco de contatos pro próximo rolê</h3><p>Todo cadastro fica salvo com nome e WhatsApp. Exporta num clique e chama quem já curtiu seu rolê.</p></div>
+        <div style="display:flex;flex-wrap:wrap;gap:9px">
+          <span class="btn btn-sm" style="cursor:default;background:var(--bg)">📇 Exportar contatos</span>
+          <span class="btn btn-sm" style="cursor:default;background:var(--bg)">💬 Chamar no Whats</span>
+          <span class="btn btn-sm" style="cursor:default;background:var(--bg)">🔁 Reusar lista</span>
+        </div>
+      </div>
+      <div class="ft d"><h3>Grátis ou valor fixo na porta</h3><p>Cada lista pode ser cortesia ou com valor. Na portaria aparece o aviso de pagamento, sem confusão.</p></div>
+      <div class="ft c"><h3>Quantas listas o rolê precisar</h3><p>Um evento, várias listas — cada DJ, cada promoter. Tudo junto na mesma portaria.</p></div>
+    </div>
+  </div></section>
+
+  <section class="sec"><div class="wrap">
+    <div class="shead"><h2>Menos papel, menos fila, zero nome perdido.</h2></div>
+    <div class="nums">
+      <div class="num o"><div class="v">0</div><div class="l">folhas de papel na portaria</div></div>
+      <div class="num"><div class="v">~3s</div><div class="l">pra achar e confirmar um nome</div></div>
+      <div class="num"><div class="v">100%</div><div class="l">dos contatos salvos pro próximo evento</div></div>
+    </div>
+  </div></section>
+
+  <section class="price" id="preco"><div class="wrap">
+    <div style="text-align:center;margin-bottom:28px"><h2 style="font-size:clamp(30px,4.5vw,46px)">Um preço. Tudo liberado.</h2></div>
+    <div class="pcard">
+      <span class="tag">${TRIAL_DIAS} DIAS GRÁTIS</span>
+      <div class="big">${precoMes}<small>/mês</small></div>
+      <p style="color:var(--ink2);font-weight:500;margin-top:4px">Comece grátis. Só paga depois de ${TRIAL_DIAS} dias.</p>
+      <ul>
+        <li>Eventos ilimitados</li>
+        <li>Listas e links ilimitados</li>
+        <li>Check-in na portaria</li>
+        <li>Banco de contatos + exportação</li>
+        <li>Relatórios por evento</li>
+        <li>Cancele quando quiser</li>
+      </ul>
+      <a class="btn btn-o btn-lg" style="width:100%" onclick="go({v:'login'})">Começar ${TRIAL_DIAS} dias grátis →</a>
+    </div>
+  </div></section>
+
+  <section class="sec" style="background:var(--ink);color:#fff;border-top:3px solid var(--ink)"><div class="wrap">
+    <div class="shead"><h2 style="color:#fff">Por onde você entra.</h2><p style="color:#cbbcae">Três portas. Escolhe a sua.</p></div>
+    <div class="acc">
+      <div class="ac port" onclick="go({v:'portaria'})"><div class="ic">🎟️</div><h3>Portaria</h3><p>É da equipe da entrada? Faz login e confere a lista do rolê de hoje.</p><span class="go">Entrar na portaria →</span></div>
+      <div class="ac ass" onclick="go({v:'login'})"><div class="ic">🚀</div><h3>Começar agora</h3><p>Monte seus eventos e listas. ${TRIAL_DIAS} dias grátis pra testar tudo.</p><span class="go">Testar grátis →</span></div>
+      <div class="ac log" onclick="go({v:'login'})"><div class="ic">👤</div><h3>Já tenho conta</h3><p>Acesse seu painel, eventos, listas e contatos.</p><span class="go">Fazer login →</span></div>
+    </div>
+  </div></section>
+
+  <section class="sec"><div class="wrap">
+    <div class="shead"><h2>Perguntas que todo mundo faz.</h2></div>
+    <div class="faq">
+      <details class="q"><summary>Precisa baixar algum app? <span class="pm">+</span></summary><div class="ans">Não. É tudo pelo navegador do celular. O cliente abre o link, se cadastra e pronto. A portaria também roda no celular da equipe.</div></details>
+      <details class="q"><summary>Como funciona o teste grátis? <span class="pm">+</span></summary><div class="ans">Você usa tudo liberado por ${TRIAL_DIAS} dias sem pagar. Só depois começa a cobrança de ${precoMes}/mês. Pode cancelar antes e não paga nada.</div></details>
+      <details class="q"><summary>Dá pra cobrar entrada? <span class="pm">+</span></summary><div class="ans">Sim. Cada lista pode ser cortesia ou com valor fixo pago na porta. A portaria mostra o aviso de pagamento na hora do check-in.</div></details>
+      <details class="q"><summary>Tem limite de eventos ou listas? <span class="pm">+</span></summary><div class="ans">Não. Com o plano ativo, eventos, listas e links são ilimitados. Um preço só, tudo liberado.</div></details>
+      <details class="q"><summary>Os contatos ficam salvos? <span class="pm">+</span></summary><div class="ans">Todos. Cada pessoa que passou vira contato com nome e WhatsApp. Dá pra exportar e chamar todo mundo de novo no próximo evento.</div></details>
+      <details class="q"><summary>Como cancelo? <span class="pm">+</span></summary><div class="ans">Direto no seu painel, a qualquer momento, sem multa. Você continua usando até o fim do período já pago.</div></details>
+    </div>
+  </div></section>
+
+  <section class="final"><div class="wrap">
+    <h2>Bora tirar a lista do papel?</h2>
+    <p>Seu próximo rolê já pode rodar tudo no celular. Comece grátis agora.</p>
+    <div class="fa"><a class="btn btn-dark btn-lg" onclick="go({v:'login'})">Testar ${TRIAL_DIAS} dias grátis →</a><a class="btn btn-lg" onclick="go({v:'portaria'})">Acesso portaria</a></div>
+  </div></section>
+
+  <footer class="foot"><div class="wrap">
+    <div style="width:100%;display:flex;justify-content:space-between;align-items:flex-end;gap:28px;flex-wrap:wrap">
+      <div class="big">LISTA<span class="b">OFF</span></div>
+      <nav class="fl">
+        <a onclick="go({v:'portaria'})">Acesso Portaria</a>
+        <a onclick="go({v:'login'})">Entrar / Criar conta</a>
+        <a onclick="document.getElementById('como').scrollIntoView({behavior:'smooth'})">Como funciona</a>
+      </nav>
+    </div>
+    <div class="cc">LISTA OFF · a lista do seu rolê, sem papel · Montes Claros, MG</div>
+  </div></footer>
   </div>`;
+  lpLiveInit();
+}
+/* coisa viva da landing */
+function lpLiveInit(){
+  let list=[{n:"Amanda Reis",s:"f",d:true},{n:"Bruno Lima",s:"m",d:false},{n:"Carla Souza",s:"f",d:false}], sex="f";
+  const ul=$("#lcUl"),emp=$("#lcEmpty"),inp=$("#lcIn"),bF=$("#lcBF"),bM=$("#lcBM"),add=$("#lcAdd"),cT=$("#lcT"),cF=$("#lcF"),cM=$("#lcM");
+  if(!ul) return;
+  const setSex=s=>{sex=s;bF.classList.toggle("on",s==="f");bM.classList.toggle("on",s==="m");};
+  bF.onclick=()=>setSex("f");bM.onclick=()=>setSex("m");
+  const esc2=s=>s.replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  function render(){
+    list.sort((a,b)=>a.n.localeCompare(b.n,"pt"));
+    ul.innerHTML="";emp.style.display=list.length?"none":"block";
+    list.forEach(x=>{const li=document.createElement("li");if(x.d)li.className="done";
+      li.innerHTML='<span class="dot '+x.s+'"></span><span class="nm">'+esc2(x.n)+'</span><button class="ck">✓</button>';
+      li.querySelector(".ck").onclick=()=>{x.d=!x.d;render();};ul.appendChild(li);});
+    const f=list.filter(x=>x.s==="f").length;cT.textContent=list.length;cF.textContent=f+"♀";cM.textContent=(list.length-f)+"♂";
+  }
+  function addN(){const v=inp.value.trim();if(v.length<2){inp.focus();return;}list.push({n:v,s:sex,d:false});inp.value="";render();inp.focus();}
+  add.onclick=addN;inp.addEventListener("keydown",e=>{if(e.key==="Enter")addN();});
+  render();
 }
 
 /* =================== FORM PARCEIRO =================== */
@@ -459,7 +738,7 @@ function renderParceiro(){
 /* =================== LOGIN / CADASTRO DO DONO (Firebase Auth) =================== */
 function renderLogin(){
   if(!_authReady){ app.innerHTML=`<div class="loader">carregando…</div>`; return; }
-  if(CURRENT_USER){ showShell(true); return go({v:'admin'}); }
+  if(CURRENT_USER){ return go({v:'escolher'}); }
   showShell(false);
   let modo="login"; // ou "cadastro"
   const draw=()=>{
@@ -495,7 +774,7 @@ function renderLogin(){
           await AUTH.signInWithEmailAndPassword(AUTH.auth,email,pw);
           toast("Bem-vindo de volta 👋");
         }
-        go({v:'admin'});
+        go({v:'escolher'});
       }catch(e){
         $("#auBtn").disabled=false; $("#auBtn").textContent=modo==="login"?"Entrar":"Criar conta →";
         toast(authErro(e));
@@ -511,6 +790,63 @@ function renderLogin(){
   };
   draw();
 }
+/* =================== ESCOLHA PÓS-LOGIN: Portaria ou Gestão =================== */
+function renderEscolher(){
+  showShell(false);
+  document.body.classList.add("pub-mode");
+  const m=app.closest(".main"); if(m) m.style.marginLeft="0";
+  const nome=((CURRENT_USER&&CURRENT_USER.displayName)||"").split(" ")[0];
+  app.innerHTML=`<div class="esc-stage">
+  <style>
+  .esc-stage{min-height:100vh;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:28px 20px}
+  .esc{width:100%;max-width:720px}
+  .esc .top{text-align:center;margin-bottom:28px}
+  .esc .logo{font-family:'Space Grotesk';font-weight:700;font-size:24px;letter-spacing:-.02em;color:var(--ink)}
+  .esc .logo .b{background:var(--yellow);color:var(--ink);border:2px solid var(--ink);padding:0 8px;margin-left:6px;border-radius:7px;box-shadow:2px 2px 0 var(--ink)}
+  .esc h1{font-family:'Space Grotesk';font-weight:700;font-size:clamp(26px,5vw,38px);margin-top:18px;line-height:1.05}
+  .esc .sub{color:var(--muted);margin-top:8px;font-weight:500}
+  .esc .cards{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .esc .c{border:3px solid var(--ink);border-radius:16px;padding:26px;box-shadow:6px 6px 0 var(--ink);cursor:pointer;background:var(--surface);transition:transform .12s,box-shadow .12s;text-align:left}
+  .esc .c:hover{transform:translate(3px,3px);box-shadow:3px 3px 0 var(--ink)}
+  .esc .c .ic{width:54px;height:54px;border:2.5px solid var(--ink);border-radius:13px;display:grid;place-items:center;font-size:27px;margin-bottom:16px;box-shadow:3px 3px 0 var(--ink)}
+  .esc .c.port .ic{background:var(--yellow)}
+  .esc .c.gest{background:var(--ink);color:#fff}.esc .c.gest .ic{background:var(--yellow);color:var(--ink)}
+  .esc .c h3{font-family:'Space Grotesk';font-weight:700;font-size:22px;margin-bottom:7px}
+  .esc .c p{font-weight:500;font-size:15px;opacity:.85}
+  .esc .c .go{margin-top:16px;font-family:'Space Grotesk';font-weight:700;display:inblock}
+  .esc .extra{text-align:center;margin-top:22px;display:flex;gap:18px;justify-content:center;flex-wrap:wrap}
+  .esc .extra a{color:var(--muted);text-decoration:none;font-weight:600;font-size:14px;cursor:pointer}
+  .esc .extra a:hover{color:var(--ink)}
+  @media(max-width:620px){.esc .cards{grid-template-columns:1fr}}
+  </style>
+    <div class="esc">
+      <div class="top">
+        <div class="logo">LISTA<span class="b">OFF</span></div>
+        <h1>${nome?`E aí, ${esc(nome)}! `:''}O que você vai fazer?</h1>
+        <p class="sub">Escolhe por onde começar.</p>
+      </div>
+      <div class="cards">
+        <div class="c port" onclick="go({v:'portaria'})">
+          <div class="ic">🎟️</div>
+          <h3>Validar na portaria</h3>
+          <p>Conferir a lista e dar check-in na entrada do rolê de hoje.</p>
+          <div class="go">Ir pra portaria →</div>
+        </div>
+        <div class="c gest" onclick="go({v:'admin'})">
+          <div class="ic">📅</div>
+          <h3>Gerenciar listas</h3>
+          <p>Criar eventos, abrir listas, gerar links e ver os relatórios.</p>
+          <div class="go">Ir pra gestão →</div>
+        </div>
+      </div>
+      <div class="extra">
+        ${isAdminGeral()?`<a onclick="go({v:'geral'})">👑 Admin Geral</a>`:''}
+        <a onclick="sairConta()">⎋ Sair da conta</a>
+      </div>
+    </div>
+  </div>`;
+}
+
 function authErro(e){
   const c=(e&&e.code)||"";
   if(c.includes("email-already-in-use")) return "Esse e-mail já tem conta. Faça login.";
@@ -546,8 +882,8 @@ async function renderPainel(){
     </div>
     ${gratis?`<div class="card" style="background:var(--yellow-tint)"><h2 style="font-size:18px">Conta grátis ✦</h2><p class="muted" style="margin-top:6px">Sua conta cria eventos e listas ilimitados, sem pagar. (Liberada pelo admin geral.)</p></div>`:`
     <div class="card">
-      <h2 style="font-size:18px;margin-bottom:4px">${ativo?"Seu plano está ativo ✓":"Escolha seu plano"}</h2>
-      <p class="muted" style="margin-bottom:14px">Com assinatura ativa, eventos e listas são ilimitados.</p>
+      <h2 style="font-size:18px;margin-bottom:4px">${ativo?"Seu plano está ativo ✓":"Assine o LISTA OFF Pro"}</h2>
+      <p class="muted" style="margin-bottom:14px">${ativo?"Eventos, listas e links ilimitados.":`Teste <b>${TRIAL_DIAS} dias grátis</b>. Depois ${fmtBRL(PLANO.preco)}/mês, cancele quando quiser.`}</p>
       <div id="planos" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px"></div>
       ${ativo?`<button class="btn btn-ghost btn-sm" style="margin-top:14px" onclick="gerenciarAssinatura()">Gerenciar / cancelar assinatura</button>`:''}
       <p class="muted" style="margin-top:12px;font-size:12px">Pagamento seguro via Stripe. Cartão de crédito. Cancele quando quiser.</p>
@@ -560,12 +896,12 @@ async function renderPainel(){
     const box=$("#planos");
     box.innerHTML=PLANOS.map(p=>{
       const atual = ativo && c.plano===p.id;
-      return `<button class="stat" style="cursor:pointer;text-align:left;border-width:${p.destaque?'3px':'2px'};${p.destaque?'background:var(--yellow-tint)':''};position:relative" onclick="assinarPlano('${p.id}')">
-        ${p.destaque?`<span class="pill pill-amber" style="position:absolute;top:-11px;right:12px">melhor preço</span>`:''}
+      return `<button class="stat" style="cursor:pointer;text-align:left;border-width:3px;background:var(--yellow-tint);position:relative" onclick="assinarPlano('${p.id}')">
+        <span class="pill pill-amber" style="position:absolute;top:-11px;right:12px">${TRIAL_DIAS} dias grátis</span>
         <div style="font-family:'Space Grotesk';font-weight:700;font-size:20px">${p.nome}</div>
-        <div class="n" style="font-size:30px;margin-top:6px">${fmtBRL(p.preco)}</div>
-        <div class="l" style="margin-top:4px">${esc(p.por)}</div>
-        <div class="btn ${atual?'btn-ghost':'btn-primary'} btn-sm" style="width:100%;margin-top:12px;pointer-events:none">${atual?'plano atual ✓':'assinar →'}</div>
+        <div class="n" style="font-size:30px;margin-top:6px">${fmtBRL(p.preco)}<span style="font-size:15px;font-weight:600">/mês</span></div>
+        <div class="l" style="margin-top:4px">eventos e listas ilimitados</div>
+        <div class="btn ${atual?'btn-ghost':'btn-primary'} btn-sm" style="width:100%;margin-top:12px;pointer-events:none">${atual?'plano atual ✓':`testar ${TRIAL_DIAS} dias grátis →`}</div>
       </button>`;
     }).join("");
   }
@@ -592,37 +928,62 @@ window.gerenciarAssinatura=async()=>{
 };
 
 /* =================== ADMIN GERAL (só Yuri) =================== */
+// classifica o status de uma conta: pago / trial / gratis / sem
+function statusConta(c){
+  if(c.gratis) return {k:"gratis", label:"Cortesia ✦", pill:"pill-amber"};
+  const now=Date.now();
+  const trialAte=c.trialAte?(c.trialAte.seconds?c.trialAte.seconds*1000:new Date(c.trialAte).getTime()):0;
+  const planoAte=c.planoAte?(c.planoAte.seconds?c.planoAte.seconds*1000:new Date(c.planoAte).getTime()):0;
+  if(c.plano && (!planoAte || planoAte>now)){
+    if(trialAte && trialAte>now) return {k:"trial", label:"Em teste", pill:"pill-gray"};
+    return {k:"pago", label:"Pagante 💳", pill:"pill-green"};
+  }
+  if(trialAte && trialAte>now) return {k:"trial", label:"Em teste", pill:"pill-gray"};
+  return {k:"sem", label:"Sem plano", pill:"pill-gray"};
+}
 async function renderAdminGeral(){
   if(!isAdminGeral()){ return go({v:'admin'}); }
   renderSidebar("geral");
   app.innerHTML=`<h1 class="page-title">Admin Geral 👑</h1>
-    <p class="muted" style="margin-bottom:16px">Todas as contas. Libere "grátis" (eventos ilimitados, sem pagar) pros seus próprios negócios.</p>
+    <p class="muted" style="margin-bottom:16px">Visão geral das contas, assinaturas e receita. Libere cortesia pros seus próprios negócios.</p>
+    <div id="agResumo" class="stat-grid" style="margin-bottom:18px"></div>
     <div class="search-box" style="margin-bottom:14px"><input id="agSearch" placeholder="buscar por e-mail ou nome…"></div>
     <div id="agList"><div class="loader">carregando contas…</div></div>`;
   const snap=await FB.getDocs(FB.collection(DB,"contas"));
   let all=snap.docs.map(d=>({uid:d.id,...d.data()}));
   all.sort((a,b)=>(a.email||"").localeCompare(b.email||""));
+  // resumo
+  let pagantes=0,trial=0,gratis=0,sem=0;
+  all.forEach(c=>{const s=statusConta(c);if(s.k==="pago")pagantes++;else if(s.k==="trial")trial++;else if(s.k==="gratis")gratis++;else sem++;});
+  const mrr=pagantes*PLANO.preco;
+  $("#agResumo").innerHTML=`
+    <div class="stat"><div class="n">${all.length}</div><div class="l">contas no total</div></div>
+    <div class="stat" style="background:var(--yellow-tint)"><div class="n">${pagantes}</div><div class="l">pagantes 💳</div></div>
+    <div class="stat"><div class="n">${trial}</div><div class="l">em teste grátis</div></div>
+    <div class="stat"><div class="n">${fmtBRL(mrr)}</div><div class="l">receita/mês (MRR)</div></div>`;
   const draw=(f="")=>{
     const q=f.toLowerCase();
     const arr=all.filter(c=>(c.email||"").toLowerCase().includes(q)||(c.nome||"").toLowerCase().includes(q));
     if(!arr.length){$("#agList").innerHTML=`<div class="empty"><div class="ic">👥</div>Nenhuma conta.</div>`;return;}
-    $("#agList").innerHTML=arr.map(c=>`<div class="card" style="margin-bottom:12px">
+    $("#agList").innerHTML=arr.map(c=>{
+      const s=statusConta(c);
+      return `<div class="card" style="margin-bottom:12px">
       <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
         <div style="flex:1;min-width:160px">
           <div style="font-weight:700">${esc(c.nome||"(sem nome)")}</div>
           <div class="muted" style="font-size:13px">${esc(c.email||"")}</div>
         </div>
-        ${c.gratis?`<span class="pill pill-amber">grátis ✦</span>`:(c.plano?`<span class="pill pill-green">${esc(c.plano)}</span>`:`<span class="pill pill-gray">sem plano</span>`)}
+        <span class="pill ${s.pill}">${s.label}</span>
       </div>
       <div class="row" style="margin-top:12px">
-        <button class="btn btn-ghost btn-sm" onclick="toggleGratis('${c.uid}',${c.gratis?'false':'true'})">${c.gratis?'tirar grátis':'liberar grátis ✦'}</button>
-      </div></div>`).join("");
+        <button class="btn btn-ghost btn-sm" onclick="toggleGratis('${c.uid}',${c.gratis?'false':'true'})">${c.gratis?'tirar cortesia':'dar cortesia ✦'}</button>
+      </div></div>`;}).join("");
   };
   draw(); $("#agSearch").oninput=e=>draw(e.target.value);
 }
 window.toggleGratis=async(uid,val)=>{
   await FB.updateDoc(FB.doc(DB,"contas",uid),{gratis:val});
-  toast(val?"Conta liberada grátis ✦":"Grátis removido");
+  toast(val?"Cortesia liberada ✦":"Cortesia removida");
   if(CURRENT_USER&&CURRENT_USER.uid===uid) await reloadConta();
   renderAdminGeral();
 };
@@ -1198,7 +1559,7 @@ function openConfirm(html,onYes){
 window.editarEvento=editarEvento;window.apagarEvento=apagarEvento;
 window.editarLista=editarLista;window.apagarLista=apagarLista;
 window.closeModal=closeModal;
-window.renderLogin=renderLogin;window.renderPainel=renderPainel;window.renderAdminGeral=renderAdminGeral;
+window.renderLogin=renderLogin;window.renderPainel=renderPainel;window.renderAdminGeral=renderAdminGeral;window.renderEscolher=renderEscolher;
 </script>
 </body>
 </html>
