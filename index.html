@@ -34,9 +34,9 @@
   const PAGAMENTO_ATIVO = false;
   // DIAS DE TESTE GRÁTIS (trial) antes de começar a cobrar
   const TRIAL_DIAS = 7;
-  // PLANO ÚNICO — R$ 99/mês, tudo ilimitado. priceId preenchido na etapa Stripe.
+  // PLANO ÚNICO — R$ 29,90/mês, tudo ilimitado. priceId preenchido na etapa Stripe.
   const PLANOS = [
-    { id:"mensal", nome:"LISTA OFF Pro", preco:99.00, ciclo:"mês", por:"R$ 99/mês", priceId:"COLE_PRICE_MENSAL", destaque:true },
+    { id:"mensal", nome:"LISTA OFF Pro", preco:29.90, ciclo:"mês", por:"R$ 29,90/mês", priceId:"COLE_PRICE_MENSAL", destaque:true },
   ];
   const PLANO = PLANOS[0];
   // URL da Firebase Function de checkout (preenchida na etapa Stripe)
@@ -311,7 +311,7 @@ function route(){
   if(v==="login") return renderLogin();
   if(v==="escolher") return guardAdmin(()=>renderEscolher());
   if(v==="geral") return guardAdmin(()=>renderAdminGeral());
-  if(v==="painel"||v==="admin"||v==="banco"||v==="relatorios" || (p.get("ev")&&!p.get("lista"))) return guardAdmin();
+  if(v==="painel"||v==="admin"||v==="banco"||v==="campanhas"||v==="relatorios" || (p.get("ev")&&!p.get("lista"))) return guardAdmin();
   return renderLanding();
 }
 function go(params){
@@ -389,6 +389,7 @@ function renderSidebar(active){
     {k:"admin",   ic:"📅", label:"Eventos"},
     {k:"portaria",ic:"🎟️", label:"Portaria"},
     {k:"banco",   ic:"📇", label:"Banco de Dados"},
+    {k:"campanhas",ic:"📣",label:"Campanhas"},
     {k:"relatorios",ic:"📊",label:"Relatórios"},
   ];
   if(PAGAMENTO_ATIVO) items.push({k:"painel",ic:"💳",label:"Assinatura"});
@@ -1021,6 +1022,7 @@ function renderAdminRoute(){
   const p=new URLSearchParams(location.search);
   if(p.get("v")==="painel") return PAGAMENTO_ATIVO ? renderPainel() : renderEventos();
   if(p.get("v")==="banco") return renderBanco();
+  if(p.get("v")==="campanhas") return renderCampanhas();
   if(p.get("v")==="relatorios") return renderRelatorios();
   if(p.get("ev")) return renderEventoDetalhe(p.get("ev"));
   return renderEventos();
@@ -1331,6 +1333,7 @@ async function renderBanco(){
       <p class="muted">Todos os contatos já cadastrados em qualquer evento, sem repetir (por WhatsApp).</p>
       <div class="search-box" style="margin:14px 0"><input id="bdSearch" placeholder="buscar por nome ou WhatsApp…"></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px;align-items:center">
+        <button class="btn btn-primary btn-sm" onclick="go({v:'campanhas'})">📣 Disparar campanha</button>
         <button class="btn btn-ghost btn-sm" id="bdExp">⬇ Exportar tudo (CSV)</button>
         <span class="pill pill-blue" id="bdCount">…</span>
       </div>
@@ -1362,6 +1365,93 @@ async function renderBanco(){
   draw(); $("#bdSearch").oninput=e=>draw(e.target.value);
   $("#bdExp").onclick=()=>{let csv="Nome,WhatsApp,Sexo,Eventos\n";all.forEach(c=>csv+=`"${c.nome}","${c.wpp}","${sexLabel(c.sex)}","${c.eventos.join('; ')}"\n`);dl(csv,"banco-de-dados-listaoff.csv");};
 }
+
+/* =================== CAMPANHAS (disparo WhatsApp) =================== */
+async function renderCampanhas(){
+  renderSidebar("campanhas");
+  app.innerHTML=`<h1 class="page-title">Campanhas 📣</h1>
+    <p class="muted" style="margin-bottom:16px">Chame seu público de novo. Filtre os contatos, escreva a mensagem e exporte pronto pra sua plataforma de disparo.</p>
+    <div id="cpWrap"><div class="loader">juntando contatos…</div></div>`;
+  // junta contatos (mesma lógica do banco), guardando evento e sexo
+  const contatos=new Map();
+  const eventosAll=await FB.getDocs(FB.collection(DB,"eventos"));
+  const eventos={docs:eventosAll.docs.filter(d=>{const o=d.data().ownerUid;return isAdminGeral()||!o||o===CURRENT_USER.uid;})};
+  const nomesEventos=[];
+  for(const ev of ordEvDocs(eventos.docs)){
+    const enome=ev.data().nome; nomesEventos.push(enome);
+    const listas=await FB.getDocs(FB.collection(DB,"eventos",ev.id,"listas"));
+    for(const l of listas.docs){
+      const cads=await FB.getDocs(FB.collection(DB,"eventos",ev.id,"listas",l.id,"cadastros"));
+      cads.forEach(c=>{const d=c.data();const tel=(d.wpp||"").replace(/\D/g,"");const key=tel||d.nomeLower;
+        if(!tel)return; // sem telefone não entra na campanha
+        if(!contatos.has(key))contatos.set(key,{nome:d.nome,wpp:d.wpp,tel,sex:d.sex,eventos:new Set()});
+        contatos.get(key).eventos.add(enome);});
+    }
+  }
+  const todos=[...contatos.values()].map(c=>({...c,eventos:[...c.eventos]}));
+  window._cpTodos=todos;
+
+  const optsEv=nomesEventos.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join("");
+  $("#cpWrap").innerHTML=`
+    <div class="card">
+      <h2 style="font-size:17px;margin-bottom:12px">1. Quem vai receber</h2>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div><label class="muted" style="font-size:13px;font-weight:600">Evento</label>
+          <select id="cpEv" style="width:100%"><option value="">Todos os eventos</option>${optsEv}</select></div>
+        <div><label class="muted" style="font-size:13px;font-weight:600">Sexo</label>
+          <select id="cpSex" style="width:100%"><option value="">Todos</option><option value="F">Só mulheres ♀</option><option value="M">Só homens ♂</option></select></div>
+      </div>
+      <div style="margin-top:12px"><span class="pill pill-green" id="cpCount">…</span></div>
+    </div>
+
+    <div class="card">
+      <h2 style="font-size:17px;margin-bottom:6px">2. A mensagem</h2>
+      <p class="muted" style="font-size:13px;margin-bottom:10px">Use <b onclick="cpInsert('{nome}')" style="cursor:pointer;background:var(--yellow-tint);padding:1px 6px;border-radius:5px;border:1px solid var(--line)">{nome}</b> pra trocar pelo nome de cada pessoa. (clique pra inserir)</p>
+      <textarea id="cpMsg" rows="5" style="width:100%;resize:vertical" placeholder="Oi {nome}! 🔥 Rolê novo chegando...">Oi {nome}! 🔥 Tá rolando evento novo no Seu Cupido. Garante seu nome na lista: listaoff.com.br</textarea>
+      <div style="margin-top:12px"><label class="muted" style="font-size:13px;font-weight:600">Prévia (com o primeiro contato)</label>
+        <div id="cpPrev" class="card" style="background:#DCF8C6;color:#111;border:2px solid var(--ink);margin-top:6px;font-size:14px;white-space:pre-wrap;box-shadow:3px 3px 0 var(--ink)"></div></div>
+    </div>
+
+    <div class="card">
+      <h2 style="font-size:17px;margin-bottom:6px">3. Disparar</h2>
+      <p class="muted" style="font-size:13px;margin-bottom:12px">Exporte a lista já com a mensagem personalizada e suba na sua plataforma de disparo (API oficial do WhatsApp). Assim não toma ban.</p>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button class="btn btn-primary" id="cpExp">⬇ Exportar campanha (CSV)</button>
+        <button class="btn btn-ghost" id="cpWa">📲 Testar no meu WhatsApp</button>
+      </div>
+      <p class="muted" style="font-size:12px;margin-top:12px">💡 O CSV sai com <b>nome, telefone e a mensagem já personalizada</b> por pessoa — formato que AiSensy, ChatGuru e afins aceitam.</p>
+    </div>`;
+
+  function filtrados(){
+    const fe=$("#cpEv").value, fs=$("#cpSex").value;
+    return todos.filter(c=>(!fe||c.eventos.includes(fe))&&(!fs||c.sex===fs));
+  }
+  function msgPara(nome,tpl){return (tpl||"").replace(/\{nome\}/g,(nome||"").split(" ")[0]);}
+  function upd(){
+    const arr=filtrados();
+    $("#cpCount").textContent=`${arr.length} contato${arr.length===1?"":"s"} vão receber`;
+    const ex=arr[0];
+    $("#cpPrev").textContent = ex ? msgPara(ex.nome,$("#cpMsg").value) : "(nenhum contato nesse filtro)";
+  }
+  window.cpInsert=(txt)=>{const t=$("#cpMsg");const s=t.selectionStart||t.value.length;t.value=t.value.slice(0,s)+txt+t.value.slice(t.selectionEnd||s);t.focus();upd();};
+  $("#cpEv").onchange=upd; $("#cpSex").onchange=upd; $("#cpMsg").oninput=upd;
+  $("#cpExp").onclick=()=>{
+    const arr=filtrados(), tpl=$("#cpMsg").value;
+    if(!arr.length)return toast("Nenhum contato nesse filtro");
+    let csv="nome,telefone,mensagem\n";
+    arr.forEach(c=>{const m=msgPara(c.nome,tpl).replace(/"/g,'""');csv+=`"${c.nome}","55${c.tel}","${m}"\n`;});
+    dl(csv,"campanha-listaoff.csv");
+    toast(`Campanha exportada: ${arr.length} contatos 📣`);
+  };
+  $("#cpWa").onclick=()=>{
+    const arr=filtrados(), tpl=$("#cpMsg").value;
+    if(!arr.length)return toast("Nenhum contato nesse filtro");
+    const c=arr[0]; const m=encodeURIComponent(msgPara(c.nome,tpl));
+    window.open(`https://wa.me/55${c.tel}?text=${m}`,"_blank");
+  };
+  upd();
+}
+window.renderCampanhas=renderCampanhas;
 
 /* =================== RELATÓRIOS =================== */
 async function renderRelatorios(){
