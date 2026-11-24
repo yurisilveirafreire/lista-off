@@ -1325,6 +1325,73 @@ async function renderListaAdmin(evId,listaId){
 }
 function dl(content,filename){const b=new Blob(["\ufeff"+content],{type:"text/csv;charset=utf-8;"});const a=document.createElement("a");a.href=URL.createObjectURL(b);a.download=filename;a.click();}
 
+/* Gera relat\u00f3rio da portaria em PDF (via impress\u00e3o do navegador) */
+function gerarPdfPortaria(ev, titulo, linhas){
+  const total=linhas.length, ins=linhas.filter(c=>c.checkin).length, faltam=total-ins;
+  const f=linhas.filter(c=>c.sex==="F").length, m=linhas.filter(c=>c.sex==="M").length, o=total-f-m;
+  const fIn=linhas.filter(c=>c.sex==="F"&&c.checkin).length, mIn=linhas.filter(c=>c.sex==="M"&&c.checkin).length;
+  const agora=new Date().toLocaleString("pt-BR",{day:"2-digit",month:"2-digit",year:"numeric",hour:"2-digit",minute:"2-digit"});
+  const dataEv = ev && ev.data ? fmtData(ev.data) : "";
+  const rows=linhas.map((c,i)=>`<tr class="${c.checkin?'in':''}">
+    <td class="num">${i+1}</td>
+    <td>${esc(c.nome)}</td>
+    <td class="sx">${c.sex==="F"?"F":c.sex==="M"?"M":"-"}</td>
+    <td class="wpp">${esc(c.wpp||"")}</td>
+    ${c._listaNome!==undefined?`<td class="lst">${esc(c._listaNome||"")}</td>`:''}
+    <td class="st">${c.checkin?"\u2714 entrou":"\u2014"}</td></tr>`).join("");
+  const temLista = linhas.length && linhas[0]._listaNome!==undefined;
+  const html=`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">
+  <title>Relat\u00f3rio ${esc(titulo)}</title>
+  <style>
+    @page{margin:14mm}
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;color:#120D08;font-size:12px}
+    .hd{border-bottom:3px solid #120D08;padding-bottom:12px;margin-bottom:16px;display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:8px}
+    .brand{font-weight:800;font-size:22px;letter-spacing:-.5px}
+    .brand b{background:#FF5C00;padding:0 7px;border-radius:5px}
+    .hd .r{text-align:right;font-size:11px;color:#555}
+    h1{font-size:19px;margin:4px 0 2px}
+    .sub{color:#666;font-size:12px;margin-bottom:14px}
+    .stats{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap}
+    .st-card{border:2px solid #120D08;border-radius:9px;padding:10px 16px;min-width:92px}
+    .st-card .n{font-size:24px;font-weight:800;line-height:1}
+    .st-card .l{font-size:10px;color:#666;text-transform:uppercase;letter-spacing:.5px;margin-top:3px}
+    .st-card.o{background:#FF5C00}
+    table{width:100%;border-collapse:collapse;font-size:11.5px}
+    th{text-align:left;border-bottom:2px solid #120D08;padding:6px 8px;font-size:10px;text-transform:uppercase;letter-spacing:.4px}
+    td{padding:6px 8px;border-bottom:1px solid #e5ddd3}
+    td.num{color:#999;width:28px}
+    td.sx{width:24px;text-align:center;font-weight:700}
+    td.st{width:80px;font-weight:700;color:#1F7A3D}
+    tr.in td{background:#f4fbf4}
+    tr:not(.in) td.st{color:#bbb}
+    .wpp{color:#555}
+    .ft{margin-top:18px;font-size:10px;color:#999;text-align:center;border-top:1px solid #e5ddd3;padding-top:10px}
+    @media print{.noprint{display:none}}
+  </style></head><body>
+    <div class="hd">
+      <div><div class="brand">LISTA<b>OFF</b></div></div>
+      <div class="r">Relat\u00f3rio de portaria<br>gerado em ${agora}</div>
+    </div>
+    <h1>${esc(titulo)}</h1>
+    <div class="sub">${dataEv?dataEv+" \u00b7 ":""}${ev&&ev.local?esc(ev.local):""}</div>
+    <div class="stats">
+      <div class="st-card o"><div class="n">${ins}</div><div class="l">entraram</div></div>
+      <div class="st-card"><div class="n">${faltam}</div><div class="l">faltam</div></div>
+      <div class="st-card"><div class="n">${total}</div><div class="l">total</div></div>
+      <div class="st-card"><div class="n">${f}</div><div class="l">fem (${fIn} entr.)</div></div>
+      <div class="st-card"><div class="n">${m}</div><div class="l">masc (${mIn} entr.)</div></div>
+    </div>
+    <table><thead><tr><th>#</th><th>Nome</th><th>Sx</th><th>WhatsApp</th>${temLista?'<th>Lista</th>':''}<th>Status</th></tr></thead>
+    <tbody>${rows}</tbody></table>
+    <div class="ft">LISTA OFF \u00b7 listaoff.com.br \u00b7 a lista do seu rol\u00ea, sem papel</div>
+    <script>window.onload=function(){setTimeout(function(){window.print();},350);};<\/script>
+  </body></html>`;
+  const w=window.open("","_blank");
+  if(!w){toast("Libere o pop-up pra gerar o PDF");return;}
+  w.document.write(html); w.document.close();
+}
+
 /* =================== BANCO DE DADOS =================== */
 async function renderBanco(){
   renderSidebar("banco");
@@ -1505,8 +1572,11 @@ async function renderPortariaUnificada(evId){
   const evSnap=await FB.getDoc(FB.doc(DB,"eventos",evId)); const ev=evSnap.data();
   app.innerHTML=`
     <button class="fab-back" onclick="go({v:'portaria'})">← trocar evento</button>
-    <h1 style="font-size:24px">${esc(ev.nome)}</h1>
-    <p class="muted">Todos os nomes de todas as listas, em ordem alfabética.</p>
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap">
+      <div><h1 style="font-size:24px">${esc(ev.nome)}</h1>
+      <p class="muted">Todos os nomes de todas as listas, em ordem alfabética.</p></div>
+      <button class="btn btn-ghost btn-sm" id="uPdf">📄 Gerar PDF</button>
+    </div>
     <div class="stat-grid" id="ustats" style="margin:14px 0"></div>
     <div class="search-box" style="margin-bottom:14px"><input id="uSearch" placeholder="buscar nome…" autofocus></div>
     <div id="uList"><div class="loader">carregando…</div></div>`;
@@ -1524,7 +1594,7 @@ async function renderPortariaUnificada(evId){
   };
   const refresh=async()=>{
     const todos=[];
-    for(const l of listas.docs){const cads=await FB.getDocs(FB.collection(DB,"eventos",evId,"listas",l.id,"cadastros"));cads.forEach(d=>todos.push({id:d.id,_lista:l.id,_valor:l.data().valor||0,...d.data()}));}
+    for(const l of listas.docs){const cads=await FB.getDocs(FB.collection(DB,"eventos",evId,"listas",l.id,"cadastros"));cads.forEach(d=>todos.push({id:d.id,_lista:l.id,_listaNome:nomeLista[l.id]||"",_valor:l.data().valor||0,...d.data()}));}
     todos.sort((a,b)=>(a.nomeLower||"").localeCompare(b.nomeLower||"")); cache=todos;
     const total=todos.length,ins=todos.filter(x=>x.checkin).length,f=todos.filter(x=>x.sex==="F").length,m=todos.filter(x=>x.sex==="M").length;
     $("#ustats").innerHTML=`
@@ -1537,14 +1607,18 @@ async function renderPortariaUnificada(evId){
   if(listas.empty){$("#uList").innerHTML=`<div class="empty"><div class="ic">📝</div>Sem listas neste evento.</div>`;$("#ustats").innerHTML="";}
   else listas.docs.forEach(l=>watch(FB.collection(DB,"eventos",evId,"listas",l.id,"cadastros"),()=>refresh()));
   $("#uSearch").oninput=e=>draw(e.target.value);
+  $("#uPdf").onclick=()=>{ if(!cache.length)return toast("Lista vazia"); gerarPdfPortaria(ev,ev.nome,cache); };
 }
 async function renderPortariaLista(evId,listaId){
   renderSidebar("portaria");
   const lSnap=await FB.getDoc(FB.doc(DB,"eventos",evId,"listas",listaId)); const L=lSnap.data();
   app.innerHTML=`
     <button class="fab-back" onclick="go({v:'portaria'})">← trocar lista</button>
-    <h1 style="font-size:24px">${esc(L.nome)}</h1>
-    ${L.valor>0?`<span class="pill pill-amber">Cobrar ${fmtBRL(L.valor)} de cada pessoa</span>`:`<span class="pill pill-gray">Lista OFF · grátis</span>`}
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap">
+      <div><h1 style="font-size:24px">${esc(L.nome)}</h1>
+      ${L.valor>0?`<span class="pill pill-amber">Cobrar ${fmtBRL(L.valor)} de cada pessoa</span>`:`<span class="pill pill-gray">Lista OFF · grátis</span>`}</div>
+      <button class="btn btn-ghost btn-sm" id="pPdf">📄 Gerar PDF</button>
+    </div>
     <div class="stat-grid" id="pstats" style="margin:14px 0"></div>
     <div class="search-box" style="margin-bottom:14px"><input id="pSearch" placeholder="buscar nome…" autofocus></div>
     <div id="pList"><div class="loader">carregando…</div></div>`;
@@ -1569,6 +1643,7 @@ async function renderPortariaLista(evId,listaId){
     draw($("#pSearch").value);
   });
   $("#pSearch").oninput=e=>draw(e.target.value);
+  $("#pPdf").onclick=()=>{ if(!cache.length)return toast("Lista vazia"); gerarPdfPortaria({nome:L.nome,data:L.data,local:L.local},L.nome,cache); };
 }
 window.setCheck=async(evId,listaId,cadId,val)=>{await FB.updateDoc(FB.doc(DB,"eventos",evId,"listas",listaId,"cadastros",cadId),{checkin:val});};
 
