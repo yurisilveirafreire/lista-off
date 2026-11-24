@@ -1,12 +1,14 @@
 /* =====================================================================
-   LISTA OFF — Firebase Functions do Stripe (compra de CRÉDITOS)
+   LISTA OFF — Firebase Functions do Stripe
+   Assinatura R$ 99/mês com 7 DIAS DE TESTE GRÁTIS (trial)
    =====================================================================
-   Reutiliza a MESMA conta Stripe do iGastei (mesma secret key).
-   Diferença: no iGastei é ASSINATURA; aqui é PAGAMENTO ÚNICO de crédito.
-   Quando a compra é paga, o webhook SOMA créditos na conta do dono.
+   Usa a MESMA conta Stripe do iGastei.
+   Plano ativo (ou em trial) => eventos, listas e links ilimitados.
 
-   Coloque este arquivo dentro da pasta `functions/` do projeto Firebase
-   `lista-off-bc957` (ou junto das functions que você já tem).
+   Coloque dentro da pasta `functions/` do projeto `lista-off-bc957`.
+   Secrets (nunca no código):
+     STRIPE_SECRET            -> sk_live_...
+     STRIPE_WEBHOOK_LISTAOFF  -> whsec_... (do webhook deste app)
    ===================================================================== */
 
 const functions = require("firebase-functions");
@@ -14,39 +16,42 @@ const admin = require("firebase-admin");
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
 
-// A secret key fica em variável de ambiente — NUNCA no código.
-// defina com:  firebase functions:secrets:set STRIPE_SECRET
-// (modo produção usa sk_live_...)
 const stripe = require("stripe")(process.env.STRIPE_SECRET);
-const WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_LISTAOFF; // whsec_...
-
-// URL do app (pra onde o Stripe volta depois do pagamento)
+const WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_LISTAOFF;
 const APP_URL = "https://listaoff.com.br";
+const TRIAL_DIAS = 7;
 
-/* ---------------------------------------------------------------------
-   1) createCheckoutListaOff — abre o checkout de um pacote de créditos
-   O app chama isto via fetch POST { priceId, uid, email, eventos, pacote }
-   --------------------------------------------------------------------- */
+/* 1) createCheckoutListaOff — abre o checkout da ASSINATURA com trial
+   body: { priceId, uid, email } */
 exports.createCheckoutListaOff = functions
   .region("us-central1")
   .https.onRequest(async (req, res) => {
-    // CORS (o app está em listaoff.com.br)
     res.set("Access-Control-Allow-Origin", "*");
     res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
     res.set("Access-Control-Allow-Headers", "Content-Type");
     if (req.method === "OPTIONS") return res.status(204).send("");
 
     try {
-      const { priceId, uid, email, eventos, pacote } = req.body || {};
+      const { priceId, uid, email } = req.body || {};
       if (!priceId || !uid) return res.status(400).json({ error: "faltam dados" });
 
+      // reusa o customer do Stripe se a conta já tiver um
+      let customer;
+      const contaSnap = await db.collection("contas").doc(uid).get();
+      const conta = contaSnap.exists ? contaSnap.data() : {};
+      if (conta.stripeCustomerId) customer = conta.stripeCustomerId;
+
       const session = await stripe.checkout.sessions.create({
-        mode: "payment", // pagamento único, não assinatura
+        mode: "subscription",
         payment_method_types: ["card"],
         line_items: [{ price: priceId, quantity: 1 }],
-        customer_email: email || undefined,
-        // esses metadados voltam no webhook pra sabermos quem creditar
-        metadata: { uid, eventos: String(eventos || 0), pacote: pacote || "" },
+        customer: customer || undefined,
+        customer_email: customer ? undefined : email || undefined,
+        subscription_data: {
+          trial_period_days: TRIAL_DIAS,         // 7 dias grátis
+          metadata: { uid, plano: "mensal" },
+        },
+        metadata: { uid, plano: "mensal" },
         success_url: `${APP_URL}/?v=painel&pag=ok`,
         cancel_url: `${APP_URL}/?v=painel&pag=cancel`,
       });
@@ -58,10 +63,38 @@ exports.createCheckoutListaOff = functions
     }
   });
 
-/* ---------------------------------------------------------------------
-   2) webhookListaOff — Stripe avisa que a compra foi paga → soma créditos
-   Configure este endpoint no painel do Stripe (evento: checkout.session.completed)
-   --------------------------------------------------------------------- */
+/* 2) portalListaOff — portal do cliente (gerenciar/cancelar assinatura)
+   body: { uid } */
+exports.portalListaOff = functions
+  .region("us-central1")
+  .https.onRequest(async (req, res) => {
+    res.set("Access-Control-Allow-Origin", "*");
+    res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
+    res.set("Access-Control-Allow-Headers", "Content-Type");
+    if (req.method === "OPTIONS") return res.status(204).send("");
+
+    try {
+      const { uid } = req.body || {};
+      const snap = await db.collection("contas").doc(uid).get();
+      const conta = snap.exists ? snap.data() : {};
+      if (!conta.stripeCustomerId) return res.status(400).json({ error: "sem assinatura" });
+      const session = await stripe.billingPortal.sessions.create({
+        customer: conta.stripeCustomerId,
+        return_url: `${APP_URL}/?v=painel`,
+      });
+      return res.json({ url: session.url });
+    } catch (e) {
+      console.error("portalListaOff", e);
+      return res.status(500).json({ error: e.message });
+    }
+  });
+
+/* 3) webhookListaOff — Stripe avisa mudanças da assinatura -> atualiza a conta
+   Eventos a escutar no painel:
+     checkout.session.completed
+     customer.subscription.created
+     customer.subscription.updated
+     customer.subscription.deleted */
 exports.webhookListaOff = functions
   .region("us-central1")
   .https.onRequest(async (req, res) => {
@@ -74,36 +107,61 @@ exports.webhookListaOff = functions
       return res.status(400).send(`Webhook Error: ${e.message}`);
     }
 
-    if (event.type === "checkout.session.completed") {
-      const s = event.data.object;
-      const uid = s.metadata && s.metadata.uid;
-      const eventos = parseInt((s.metadata && s.metadata.eventos) || "0", 10);
-      const valor = (s.amount_total || 0) / 100;
+    try {
+      // liga a conta ao customer do Stripe assim que a compra fecha
+      if (event.type === "checkout.session.completed") {
+        const s = event.data.object;
+        const uid = s.metadata && s.metadata.uid;
+        if (uid && s.customer) {
+          await db.collection("contas").doc(uid).set(
+            { stripeCustomerId: s.customer }, { merge: true }
+          );
+          await db.collection("compras").add({
+            uid, plano: (s.metadata && s.metadata.plano) || "mensal",
+            email: s.customer_email || "",
+            stripeSession: s.id, criadoEm: admin.firestore.FieldValue.serverTimestamp(),
+          });
+        }
+      }
 
-      if (uid && eventos > 0) {
-        try {
+      // assinatura criada/renovada/em trial -> grava plano + validade + trial
+      if (event.type === "customer.subscription.created" ||
+          event.type === "customer.subscription.updated") {
+        const sub = event.data.object;
+        const uid = sub.metadata && sub.metadata.uid;
+        // ativo se paga OU em período de teste
+        const ativo = sub.status === "active" || sub.status === "trialing";
+        const ate = sub.current_period_end
+          ? admin.firestore.Timestamp.fromMillis(sub.current_period_end * 1000)
+          : null;
+        const trialAte = sub.trial_end
+          ? admin.firestore.Timestamp.fromMillis(sub.trial_end * 1000)
+          : null;
+        if (uid) {
           await db.collection("contas").doc(uid).set(
             {
-              creditos: admin.firestore.FieldValue.increment(eventos),
-              gastoTotal: admin.firestore.FieldValue.increment(valor),
+              plano: ativo ? "mensal" : null,
+              planoAte: ativo ? ate : null,
+              trialAte: trialAte,
+              stripeCustomerId: sub.customer,
             },
             { merge: true }
           );
-          // registro da compra (pra você acompanhar vendas no back)
-          await db.collection("compras").add({
-            uid,
-            eventos,
-            valor,
-            pacote: (s.metadata && s.metadata.pacote) || "",
-            email: s.customer_email || "",
-            stripeSession: s.id,
-            criadoEm: admin.firestore.FieldValue.serverTimestamp(),
-          });
-          console.log(`+${eventos} créditos para ${uid} (R$ ${valor})`);
-        } catch (e) {
-          console.error("erro ao creditar", e);
         }
       }
+
+      // assinatura cancelada/expirada -> tira o plano
+      if (event.type === "customer.subscription.deleted") {
+        const sub = event.data.object;
+        const uid = sub.metadata && sub.metadata.uid;
+        if (uid) {
+          await db.collection("contas").doc(uid).set(
+            { plano: null, planoAte: null }, { merge: true }
+          );
+        }
+      }
+    } catch (e) {
+      console.error("erro ao processar webhook", e);
     }
 
     return res.json({ received: true });
