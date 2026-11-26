@@ -1472,8 +1472,8 @@ async function renderCampanhas(){
     </div>
 
     <div class="card">
-      <h2 style="font-size:17px;margin-bottom:6px">2. A mensagem</h2>
-      <p class="muted" style="font-size:13px;margin-bottom:10px">Use <b onclick="cpInsert('{nome}')" style="cursor:pointer;background:var(--yellow-tint);padding:1px 6px;border-radius:5px;border:1px solid var(--line)">{nome}</b> pra trocar pelo nome de cada pessoa. (clique pra inserir)</p>
+      <h2 style="font-size:17px;margin-bottom:6px">2. A mensagem (rascunho)</h2>
+      <p class="muted" style="font-size:13px;margin-bottom:10px">Escreva aqui pra ter o texto pronto — depois é só colar na Transmissão do BotConversa. Use <b onclick="cpInsert('{nome}')" style="cursor:pointer;background:var(--yellow-tint);padding:1px 6px;border-radius:5px;border:1px solid var(--line)">{nome}</b> pro nome de cada pessoa (no BotConversa o campo é o nome do contato).</p>
       <textarea id="cpMsg" rows="5" style="width:100%;resize:vertical" placeholder="Oi {nome}! 🔥 Rolê novo chegando...">Oi {nome}! 🔥 Tá rolando evento novo no Seu Cupido. Garante seu nome na lista: listaoff.com.br</textarea>
       <div style="margin-top:12px"><label class="muted" style="font-size:13px;font-weight:600">Prévia (com o primeiro contato)</label>
         <div id="cpPrev" class="card" style="background:#DCF8C6;color:#111;border:2px solid var(--ink);margin-top:6px;font-size:14px;white-space:pre-wrap;box-shadow:3px 3px 0 var(--ink)"></div></div>
@@ -1481,12 +1481,12 @@ async function renderCampanhas(){
 
     <div class="card">
       <h2 style="font-size:17px;margin-bottom:6px">3. Disparar</h2>
-      <p class="muted" style="font-size:13px;margin-bottom:12px">Exporte a lista já com a mensagem personalizada e suba na sua plataforma de disparo (API oficial do WhatsApp). Assim não toma ban.</p>
+      <p class="muted" style="font-size:13px;margin-bottom:12px">Exporte os contatos e suba no <b>BotConversa</b> (Contatos → Importar). A mensagem você escreve lá na Transmissão, com o nome automático. Assim roda pela API oficial, sem ban.</p>
       <div style="display:flex;gap:10px;flex-wrap:wrap">
-        <button class="btn btn-primary" id="cpExp">⬇ Exportar campanha (CSV)</button>
+        <button class="btn btn-primary" id="cpExp">⬇ Exportar pro BotConversa</button>
         <button class="btn btn-ghost" id="cpWa">📲 Testar no meu WhatsApp</button>
       </div>
-      <p class="muted" style="font-size:12px;margin-top:12px">💡 O CSV sai com <b>nome, telefone e a mensagem já personalizada</b> por pessoa — formato que AiSensy, ChatGuru e afins aceitam.</p>
+      <p class="muted" style="font-size:12px;margin-top:12px">💡 O arquivo sai no formato do BotConversa: <b>primeiro nome · sobrenome · telefone · etiquetas</b> (listaoff + evento). É só importar.</p>
     </div>`;
 
   function filtrados(){
@@ -1503,12 +1503,22 @@ async function renderCampanhas(){
   window.cpInsert=(txt)=>{const t=$("#cpMsg");const s=t.selectionStart||t.value.length;t.value=t.value.slice(0,s)+txt+t.value.slice(t.selectionEnd||s);t.focus();upd();};
   $("#cpEv").onchange=upd; $("#cpSex").onchange=upd; $("#cpMsg").oninput=upd;
   $("#cpExp").onclick=()=>{
-    const arr=filtrados(), tpl=$("#cpMsg").value;
+    const arr=filtrados();
     if(!arr.length)return toast("Nenhum contato nesse filtro");
-    let csv="nome,telefone,mensagem\n";
-    arr.forEach(c=>{const m=msgPara(c.nome,tpl).replace(/"/g,'""');csv+=`"${c.nome}","55${c.tel}","${m}"\n`;});
-    dl(csv,"campanha-listaoff.csv");
-    toast(`Campanha exportada: ${arr.length} contatos 📣`);
+    const fe=$("#cpEv").value;
+    // formato do BotConversa: primeiro nome, sobrenome, telefone, etiquetas
+    let csv="primeiro nome,sobrenome,telefone,etiquetas\n";
+    arr.forEach(c=>{
+      const partes=(c.nome||"").trim().split(/\s+/);
+      const pn=partes.shift()||""; const sn=partes.join(" ");
+      const tel=(c.tel||"").replace(/\D/g,""); const fone=tel.startsWith("55")?tel:"55"+tel;
+      // etiquetas: "listaoff" + eventos (ou o evento filtrado)
+      const tags=["listaoff",...(fe?[fe]:c.eventos)].map(t=>(t||"").replace(/[",]/g,"")).filter(Boolean);
+      const q=s=>`"${String(s).replace(/"/g,'""')}"`;
+      csv+=`${q(pn)},${q(sn)},${q(fone)},${q(tags.join(", "))}\n`;
+    });
+    dl(csv,"contatos-botconversa.csv");
+    toast(`${arr.length} contatos exportados pro BotConversa 📣`);
   };
   $("#cpWa").onclick=()=>{
     const arr=filtrados(), tpl=$("#cpMsg").value;
